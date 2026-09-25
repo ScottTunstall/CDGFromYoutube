@@ -10,23 +10,35 @@ cdgfromyoutube "https://www.youtube.com/watch?v=..." -o "C:\Music\Karaoke"
 
 ## What it needs
 
-* The .NET 10 SDK to build it, or the published executable to run it.
-* **yt-dlp** to download the video and **ffmpeg** (with **ffprobe**) to decode it. The program looks for
-  them in `tools` beside the executable, next to the executable itself, and on the `PATH`. If they are
-  missing it says so and names the `winget` package for each.
+* Windows. The tools are looked for, and downloaded, as Windows executables (`yt-dlp.exe`, `ffmpeg.exe`,
+  `ffprobe.exe`, `deno.exe`).
+* The .NET 10 SDK to build it, or the published executable to run it. To build and run from source:
+
+  ```console
+  dotnet run --project src/CdgFromYoutube -- "<url>" -o output
+  ```
+
+* **yt-dlp** to download the video and **ffmpeg** (with **ffprobe**) to decode it. Unless a path is given
+  with `--yt-dlp` or `--ffmpeg`, each is looked for in this order: a `tools` folder in the current
+  directory, the folder the executable is in, a `tools` folder beside the executable, and the `PATH`.
+  ffprobe is looked for beside ffmpeg first. If one is missing the program says so and names its `winget`
+  package (`yt-dlp.yt-dlp`, `Gyan.FFmpeg`).
 * **Deno** as a JavaScript runtime for yt-dlp. YouTube hides how to reach many of its videos behind a
   JavaScript challenge; with no engine to solve it, yt-dlp either falls back to worse formats or the media
   download is refused with `HTTP Error 403: Forbidden`. Deno is looked for in the same places as the other
-  tools, and `--js-runtime <path>` points at it explicitly.
-* `--download-tools` fetches all three into a `tools` folder for you, which is the quickest way to get
-  going:
+  tools, and `--js-runtime <path>` points at it explicitly. It is optional: without it the program still
+  runs, and passes on yt-dlp's warnings about it.
+* `--download-tools` fetches whichever of the three are missing into `tools` in the current directory,
+  which is the quickest way to get going:
 
   ```console
   cdgfromyoutube "<url>" --download-tools -o output
   ```
 
-  yt-dlp and Deno come from their own release pages, and ffmpeg from the Windows build that gyan.dev
-  publishes. They are downloaded from their project pages and never bundled with this program.
+  yt-dlp and Deno come from their GitHub release pages, and ffmpeg and ffprobe from the Windows
+  "essentials" build that gyan.dev publishes (about 50 MB). They are downloaded from their project pages
+  and never bundled with this program. A failed Deno download is reported as a warning rather than
+  stopping the conversion.
 
 ## Options
 
@@ -36,8 +48,8 @@ cdgfromyoutube "https://www.youtube.com/watch?v=..." -o "C:\Music\Karaoke"
 | `-n, --name <name>` | Base name of the output files. Default: the video title. |
 | `--fps <1-60>` | Frames per second taken from the video. Default: 15. |
 | `--mp3-bitrate <8-320>` | MP3 bit rate in kbps. Default: 192. Reduced automatically if the sample rate cannot carry it. |
-| `--mp3-sample-rate <hz>` | MP3 sample rate. Default: the source rate where MP3 carries it. |
-| `--max-source-height <px>` | Do not download a source video taller than this, which saves bandwidth when the output is only 216 pixels tall anyway. |
+| `--mp3-sample-rate <hz>` | MP3 sample rate: one of 8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100 or 48000. Default: the highest of those that is no higher than the source rate. |
+| `--max-source-height <1-4320>` | Do not download a source video taller than this many pixels, which saves bandwidth when the output is only 216 pixels tall anyway. |
 | `--dither` | Mix the two colors inside a tile so gradients stop banding. |
 | `--safe-area` | Keep the image inside the 288x192 area that every player shows. Default: use the whole 300x216 raster. |
 | `--crop <auto\|l,t,r,b>` | Cut the margins off the video before scaling it, so the lyrics are drawn bigger and less blocky. `auto` finds the area where the picture keeps changing, which is the lyrics; four numbers cut those percentages from the left, top, right and bottom. Default: no cropping. |
@@ -60,12 +72,19 @@ is the entire graphics budget of the format, and no amount of computer power cha
   converts beautifully and runs at the full frame rate.
 * Moving video can only be shown as a slow sequence of screens. The program spends the packets it has and
   **drops any frame it cannot pay for**, then reports how many it dropped.
+* Frames that mostly **clear** the screen are **held back**. Karaoke videos wipe the lyric area before
+  drawing the next verse. Drawing that empty moment would spend the packets the next verse needs and leave
+  the screen black for seconds. So a frame that blanks at least 8 tiles, and blanks more tiles than it
+  draws, is skipped and the lines already on screen stay up. After 30 such frames in a row the picture
+  is drawn anyway, so a scene that really goes dark still does.
 
-A measured example, a 19 second live action clip:
+At the end the program reports what happened to the frames:
 
 ```text
-Graphics: 7 frames drawn and 277 dropped, which is 0.37 frames a second over 00:00:19.
+Graphics: <n> frames drawn, <n> dropped, <n> held back as states the picture passed through, which is <rate> frames a second over <hh:mm:ss>.
 ```
+
+On a 19 second live action clip, 7 frames were drawn and 277 dropped, which is 0.37 frames a second.
 
 That is not a defect in this program; it is what a 28.8 kbit/s graphics channel does with video. What the
 program guarantees is that nothing drifts out of step with the audio:
@@ -101,11 +120,14 @@ The encoder works around these where it can:
 * **The tile's colours are chosen by scoring every pair** of palette entries against the tile's own colour
   counts, not by taking the two most common colours. Choosing by frequency picks middling colours for a
   tile that covers part of a gradient, which is what leaves a flat patch where the picture is smooth.
-* **The palette is cut by color range, not by pixel count, and refuses near duplicates.** Splitting the
-  group with the widest spread of colors stops a track with a black background from spending most of the
-  table on near black entries; an entry that still lands on top of another is passed over for a color that
-  is genuinely different. The track above went from a table of six near blacks and one white to black,
-  dark reds, greys, white and the pinks in the logo.
+* **The palette is chosen by median cut, with black reserved.** Entry 0 is always black. The other
+  fifteen come from splitting the sampled colours: the group holding the most pixels is split along its
+  widest channel at the point where half its pixels fall on each side, and each final group gives its
+  average colour. Colours dark enough to count as background (see below) are left out before the split,
+  so a track with a black background does not spend the table on near black entries.
+* **The picture is sharpened after it is scaled.** Scaling to 300x216 turns thin lettering into a wash of
+  half shades. An unsharp mask (5x5, luma amount 0.8) pushes edge pixels back towards the colour they
+  belong to, so each tile's two colours have a clearer edge to follow.
 * **Only tiles that change are written**, so a still picture costs nothing to hold and every packet goes to
   the parts of the picture that moved.
 * **`--crop auto` makes the lyrics bigger.** The biggest cause of blocky lettering is how few pixels
@@ -114,7 +136,7 @@ The encoder works around these where it can:
   video once a second, keeps the pixels that change in at least 4 samples (or 2% of them, if that is
   more), and crops to the box around them with a 2% border. Lyrics are drawn, highlighted and cleared page
   after page, so they change constantly; a logo that stays on screen never changes, and a title card changes
-  only briefly, so neither widens the box. On the track above the lyrics grew about 1.45x and filled the
+  only briefly, so neither widens the box. On a 3:48 karaoke track the lyrics grew about 1.45x and filled the
   screen. The costs: anything outside the lyrics, such as the ends of a wide title card, is cut off, and
   bigger letters take more tiles, so a page change takes longer to draw.
 * **Everything dark is drawn as colour 0, the background.** Players such as KaraFun show their own backdrop
@@ -131,23 +153,13 @@ The encoder works around these where it can:
   (instruction 38) flips the pixels of the third. That costs a second packet, so it is only used where a
   whole group of pixels would otherwise be wrong, and the second passes are written after every tile's first
   pass and only with the packets left before the next frame: a new page goes up as fast as before, and any
-  second pass that did not fit is added by a later frame for one packet. On the track above this cut the
-  highlighted lyric pixels drawn as black from 2.5% to 0.9% and raised the mean from 23.3 dB to 23.8 dB.
+  second pass that did not fit is added by a later frame for one packet. A third colour is only used when
+  it cuts the tile's error by a set margin, so a few antialiased edge pixels do not trigger it. On a 3:48
+  karaoke track this cut the highlighted lyric pixels drawn as black from 2.5% to 0.9%.
 
-Measured on a 3:48 karaoke track, decoding the result exactly as a player would and comparing it with the
-source frame by frame:
-
-| Change | Mean error against the source |
-| --- | --- |
-| Pairs chosen by frequency, palette cut by pixel count | 23.8 dB |
-| Pairs scored, palette cut by color range and spread out | **24.1 dB** |
-| ...with `--dither` | 23.8 dB |
-| ...with the picture sharpened before reduction | 23.1 dB |
-
-Two things that sound like they should help were measured and rejected. Dithering mixes the two colours of
-a tile, which softens gradients, but at this resolution it costs accuracy and turns block edges into
-visible speckle, so it stays off unless `--dither` asks for it. Sharpening before reduction also measured
-worse, because the half shades it removes are real information that the palette was representing.
+Dithering sounds like it should help, but it stays off unless `--dither` asks for it. Mixing the two
+colours of a tile softens gradients, but on that same track it measured worse against the source, and it
+turns the edges of lettering, which is about one pixel thick at this size, into visible speckle.
 
 An amplified difference image against the source shows where the remaining error sits: the background is
 pixel exact, and everything that is wrong is on the lettering itself, along its antialiased edges. That is
@@ -155,30 +167,47 @@ limit 3 above and no encoder can get past it. Practically, if the blocks you see
 as a plasma background, `--dither` trades them for a fine pattern; if they are on the edges of letters,
 that is the format.
 
-`scripts/compare-cdg.ps1` produces that measurement for any pair of files, and `scripts/render-cdg.ps1`
-writes the picture out at chosen moments so it can be looked at without a karaoke player.
+The PowerShell scripts in `scripts/` help with this kind of checking:
+
+* `compare-cdg.ps1 -CdgPath -SourcePath -OutputDirectory -FfmpegPath` decodes the `.cdg` as a player
+  would and compares it with the source video once a second.
+* `render-cdg.ps1 -CdgPath -Seconds -OutputDirectory [-ShowTransparency]` writes the picture out at the
+  given moments, so it can be looked at without a karaoke player.
+* `measure-blackness.ps1 -ComparisonDirectory [-PixelStride]` measures how much blacker the `.cdg` is
+  than the source, using the output of `compare-cdg.ps1`. That is how a wiped lyric line left on screen
+  shows up.
 
 ## How the conversion works
 
 1. **Download.** yt-dlp fetches the best video and audio into a temporary folder, merged into Matroska so
-   that any combination of codecs works.
-2. **Probe.** ffprobe reports the length, the video size, and the audio sample rate and channel count.
-3. **Resolution rule.** Frames are scaled into the raster with their shape preserved and padded with
-   black, so widescreen video gains bars instead of being stretched. Anything larger than 300x216 is
-   scaled down; anything smaller is scaled up, because the raster is a fixed size.
-4. **Sample rate rule.** The MP3 keeps the source sample rate whenever MP3 carries it (8, 11.025, 12, 16,
-   22.05, 24, 32, 44.1 or 48 kHz). A source above 48 kHz is reduced to the highest rate that MP3 carries,
-   and the bit rate is reduced too if the chosen rate cannot carry it.
-5. **Palette.** One sixteen color palette is chosen for the whole track by median cut, from frames sampled
-   at one per second. A fixed palette is what makes incremental drawing possible: changing the color table
-   part way through would force every tile to be redrawn.
-6. **Tiles.** Each frame is reduced to 6x12 tiles. A tile may only use two of the sixteen colors, so each
-   tile is rebuilt from the pair that best explains the pixels inside it, and the twelve scanline bytes say
-   which pixels take which of the two. Only the tiles that differ from what is already on screen are
-   written, which is why a still image costs nothing to hold.
-7. **Audio.** ffmpeg decodes the audio to sixteen bit stereo PCM at the chosen rate, and LAME (through
+   that any combination of codecs works. It is limited to `--max-source-height` when that is given, and
+   playlists are ignored, so only the one video is fetched.
+2. **Probe.** ffprobe reports the length, the video size, and the audio sample rate and channel count. The
+   conversion stops if there is no video, no audio, or no length.
+3. **Lyric area** (only with `--crop auto`). Frames sampled once a second at 320 pixels wide are compared
+   to find the area that keeps changing, and the crop margins are set from it.
+4. **Resolution rule.** Frames are cropped if asked, scaled into the raster with their shape preserved
+   (Lanczos), sharpened, and padded with black to 300x216 with the picture centred. So widescreen video
+   gains bars instead of being stretched. Anything larger than the raster is scaled down; anything smaller
+   is scaled up, because the raster is a fixed size. With `--safe-area` the picture is fitted into 288x192
+   instead.
+5. **Sample rate rule.** The MP3 uses the highest rate MP3 carries (8, 11.025, 12, 16, 22.05, 24, 32, 44.1
+   or 48 kHz) that is no higher than the source, so a source MP3 already carries keeps its rate and a
+   source above 48 kHz is reduced. The bit rate is reduced too if the chosen rate cannot carry it: at most
+   320 kbps from 32 kHz up, 160 kbps from 16 kHz, and 64 kbps below that.
+6. **Palette.** One sixteen color palette is chosen for the whole track by median cut, from frames sampled
+   at one per second, with black reserved as entry 0. A fixed palette is what makes incremental drawing
+   possible: changing the color table part way through would force every tile to be redrawn.
+7. **Tiles.** The file starts by clearing the screen, loading the color table and clearing the border.
+   Each frame is then reduced to 6x12 tiles. A tile may only use two of the sixteen colors, so each tile is
+   rebuilt from the pair that best explains the pixels inside it, and the twelve scanline bytes say which
+   pixels take which of the two. Where a third colour is worth it, an XOR tile adds it. Only the tiles that
+   differ from what is already on screen are written, which is why a still image costs nothing to hold.
+   Frames that mostly clear the screen are held back, and frames the packet budget cannot pay for are
+   dropped.
+8. **Audio.** ffmpeg decodes the audio to sixteen bit stereo PCM at the chosen rate, and LAME (through
    NAudio.Lame) encodes it to MP3.
-8. **Finish.** The graphics stream is padded to exactly the length of the track and the temporary folder is
+9. **Finish.** The graphics stream is padded to exactly the length of the track and the temporary folder is
    removed, unless `--keep-temp` was given.
 
 ## Project layout
@@ -186,7 +215,7 @@ writes the picture out at chosen moments so it can be looked at without a karaok
 ```text
 src/CdgFromYoutube/
   Cdg/          the packet format, color table, palette building, tile encoding and packet budget
-  Imaging/      pixel layout, aspect fitting and the ordered dither matrix
+  Imaging/      pixel layout, aspect fitting, cropping, lyric area detection and the ordered dither matrix
   Media/        yt-dlp, ffprobe, ffmpeg and LAME: everything that touches the outside world
   Tooling/      finding, and if asked, downloading the external tools
   CommandLine/  options and the hand written argument parser
@@ -205,8 +234,10 @@ layout. The classes that depend on the format say so in their `<remarks>`.
 dotnet test
 ```
 
-The suite covers the color table packing, the tile bit order, the packet budget and frame dropping, the
-palette reduction, the ffprobe parsing and the command line.
+The xUnit suite covers the color table packing, the packet writer, the tile encoding and its bit order,
+the packet budget with frame dropping and holding back, the palette reduction, the ffmpeg filter chain,
+cropping and lyric area detection, the ffprobe parsing, the MP3 sample and bit rates, output file naming, the yt-dlp command line,
+and the program's own command line.
 
 ## Checking a file yourself
 
