@@ -128,8 +128,19 @@ The encoder works around these where it can:
 * **The picture is sharpened after it is scaled.** Scaling to 300x216 turns thin lettering into a wash of
   half shades. An unsharp mask (5x5, luma amount 0.8) pushes edge pixels back towards the colour they
   belong to, so each tile's two colours have a clearer edge to follow.
+* **Colour is strengthened 1.5x after sharpening.** Video stores colour at a lower resolution than
+  brightness, so the edges of coloured lettering lose their colour and an orange letter is ringed with
+  dull browns and greys. Those used to take palette entries and show up as odd patches on the letters.
+  Boosting saturation pulls them back to the letter's colour and leaves white lettering alone. On a
+  karaoke track it cut these edge pixels from 8% of the lettering to 2%. It also makes live action video
+  look more saturated.
 * **Only tiles that change are written**, so a still picture costs nothing to hold and every packet goes to
-  the parts of the picture that moved.
+  the parts of the picture that moved. "Change" is measured against the source: a tile is only redrawn
+  when the new drawing comes closer to the source than what is on screen by a set margin. Without that,
+  compression noise flips edge pixels and swaps letters between near identical palette entries from frame
+  to frame, and unchanged lettering flickers. A smaller improvement that holds for 6 drawn frames in a row
+  is drawn anyway, so leftover pixels from a faded line and wrong pixels inside a letter are cleared
+  within about half a second. Noise comes and goes, so it never builds up a run like that.
 * **`--crop auto` makes the lyrics bigger.** The biggest cause of blocky lettering is how few pixels
   each letter gets. A 16:9 video fitted into 300x216 leaves 48 rows empty, and the lyrics often use only the
   middle two thirds of the width, so a line of lyrics was about 8 pixels tall. `--crop auto` samples the
@@ -187,8 +198,8 @@ The PowerShell scripts in `scripts/` help with this kind of checking:
 3. **Lyric area** (only with `--crop auto`). Frames sampled once a second at 320 pixels wide are compared
    to find the area that keeps changing, and the crop margins are set from it.
 4. **Resolution rule.** Frames are cropped if asked, scaled into the raster with their shape preserved
-   (Lanczos), sharpened, and padded with black to 300x216 with the picture centred. So widescreen video
-   gains bars instead of being stretched. Anything larger than the raster is scaled down; anything smaller
+   (Lanczos), sharpened, boosted in saturation, and padded with black to 300x216 with the picture
+   centred. So widescreen video gains bars instead of being stretched. Anything larger than the raster is scaled down; anything smaller
    is scaled up, because the raster is a fixed size. With `--safe-area` the picture is fitted into 288x192
    instead.
 5. **Sample rate rule.** The MP3 uses the highest rate MP3 carries (8, 11.025, 12, 16, 22.05, 24, 32, 44.1
@@ -202,7 +213,8 @@ The PowerShell scripts in `scripts/` help with this kind of checking:
    Each frame is then reduced to 6x12 tiles. A tile may only use two of the sixteen colors, so each tile is
    rebuilt from the pair that best explains the pixels inside it, and the twelve scanline bytes say which
    pixels take which of the two. Where a third colour is worth it, an XOR tile adds it. Only the tiles that
-   differ from what is already on screen are written, which is why a still image costs nothing to hold.
+   differ from what is already on screen, by enough to be worth it (see "Only tiles that change are
+   written" above), are written, which is why a still image costs nothing to hold.
    Frames that mostly clear the screen are held back, and frames the packet budget cannot pay for are
    dropped.
 8. **Audio.** ffmpeg decodes the audio to sixteen bit stereo PCM at the chosen rate, and LAME (through
@@ -235,9 +247,9 @@ dotnet test
 ```
 
 The xUnit suite covers the color table packing, the packet writer, the tile encoding and its bit order,
-the packet budget with frame dropping and holding back, the palette reduction, the ffmpeg filter chain,
-cropping and lyric area detection, the ffprobe parsing, the MP3 sample and bit rates, output file naming, the yt-dlp command line,
-and the program's own command line.
+the packet budget with frame dropping and holding back, when a changed tile is worth redrawing, the
+palette reduction, the ffmpeg filter chain, cropping and lyric area detection, the ffprobe parsing, the MP3
+sample and bit rates, output file naming, the yt-dlp command line, and the program's own command line.
 
 ## Checking a file yourself
 
