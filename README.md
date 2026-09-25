@@ -8,6 +8,65 @@ base name.
 cdgfromyoutube "https://www.youtube.com/watch?v=..." -o "C:\Music\Karaoke"
 ```
 
+## Quick start
+
+1. Run the installer, `CDGFromYoutubeSetup.exe` (build it yourself from
+   [installer/](installer/README.md), or use one someone gave you). It installs the program and, if it
+   is missing, the .NET 10 runtime.
+2. Open a new Command Prompt (the installer only adds the program to the PATH other windows read at
+   startup, so one open before you ran it won't see it).
+3. Run it against a video, the first time with `--download-tools` so it fetches yt-dlp and ffmpeg:
+
+   ```console
+   cdgfromyoutube "https://www.youtube.com/watch?v=..." --download-tools -o "C:\Music\Karaoke"
+   ```
+
+   Replace the URL with a real YouTube video. This only needs to be done once; later runs can drop
+   `--download-tools`.
+4. Copy the `.cdg` and `.mp3` it wrote into your karaoke player's song folder. Most players, including
+   KaraFun, pick up the pair automatically because the file names match.
+
+That's it. `-h` lists every other option, and `--crop auto` is worth trying if the lyrics come out small.
+
+## Building and running from source
+
+The installer is the easy way to run this program; everything below is instead for building and running
+it directly from this folder — the one holding `README.md` and `src/` — with no separate install step,
+on Windows with the .NET 10 SDK.
+
+1. **Build and run once, fetching the tools it needs.** yt-dlp, ffmpeg, ffprobe and Deno are downloaded
+   into `tools/` in the current directory the first time, so only the first run needs `--download-tools`
+   and only the first run is slow (ffmpeg is about 50 MB):
+
+   ```console
+   dotnet run --project src/CdgFromYoutube -- "https://www.youtube.com/watch?v=..." --download-tools -o output
+   ```
+
+   Replace the URL with a real YouTube video. `-o output` writes the `.cdg` and `.mp3` into an `output`
+   folder inside this one; use a full path such as `-o "C:\Music\Karaoke"` to write somewhere else.
+
+2. **Look at what it wrote.** `output` now holds a `.cdg` and an `.mp3` with the same base name, taken from
+   the video's title. Copy both into your karaoke player's song folder; most players, including KaraFun,
+   pick up the pair automatically because the names match.
+
+3. **Run it again without downloading anything.** Once `tools/` holds the executables, drop
+   `--download-tools`:
+
+   ```console
+   dotnet run --project src/CdgFromYoutube -- "https://www.youtube.com/watch?v=..." -o output
+   ```
+
+   If you build a standalone `cdgfromyoutube.exe` instead (`dotnet publish`), it looks for `tools/` beside
+   itself as well as in the current directory, so the same `tools/` folder works for both.
+
+4. **If the lyrics look small or blocky**, add `--crop auto` to fill more of the screen with them (see
+   "Graphics quality" below for what this trades off). If a video fails to download with
+   `HTTP Error 403: Forbidden`, that is what Deno is for; `--download-tools` should already have fetched
+   it, but see "What it needs" below if it did not.
+
+From here, `-h` lists every option, and the sections below explain what the format can and cannot do and
+why the defaults are what they are.
+
 ## What it needs
 
 * Windows. The tools are looked for, and downloaded, as Windows executables (`yt-dlp.exe`, `ffmpeg.exe`,
