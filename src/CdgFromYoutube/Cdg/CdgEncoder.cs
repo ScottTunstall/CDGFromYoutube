@@ -48,6 +48,36 @@ public sealed class CdgEncoder
     /// </remarks>
     private const int MaximumHeldBackInARow = 30;
 
+    /// <summary>
+    /// How much closer to the source a new drawing of a tile has to come than the tile already on screen,
+    /// in squared four bit channel steps summed over its pixels, before it is drawn.
+    /// </summary>
+    /// <remarks>
+    /// Compression noise in the source moves an edge pixel of a letter from one palette entry to the next
+    /// and back, or tips a whole letter between two entries that are a shade apart, from one frame to the
+    /// next. Redrawing every such change makes lettering that has not changed flicker, and spends packets
+    /// doing it. A tile on screen that is as good a match for the source as the new drawing, or nearly
+    /// so, is left alone; a real change such as a letter appearing or a highlight passing over it costs
+    /// thousands and is drawn at once.
+    /// </remarks>
+    private const int MinimumRedrawGain = 600;
+
+    /// <summary>
+    /// How many drawn frames in a row a new drawing of a tile may be better than the screen, by less than
+    /// <see cref="MinimumRedrawGain"/>, before it is drawn anyway.
+    /// </summary>
+    /// <remarks>
+    /// The margin alone cannot tell noise from a small change that is real. A few pixels of a lyric line
+    /// that faded out, left behind on a black background, cost less than the margin, so they would stay
+    /// on screen for good, and so would a wrong pixel inside a letter. Noise comes and goes, so it never
+    /// makes a run of frames that all want the same tile redrawn; a pixel that is simply wrong does, and
+    /// is put right after this many frames, which is under half a second at the default frame rate.
+    /// </remarks>
+    private const int StaleFrameLimit = 6;
+
+    /// <summary>For each tile, how many drawn frames in a row have wanted it redrawn without earning it.</summary>
+    private readonly int[] _staleFrameCounts = new int[CdgFormat.TileCount];
+
     /// <summary>Creates an encoder for a track of the given length.</summary>
     /// <param name="writer">The stream of packets to write to.</param>
     /// <param name="palette">The palette whose colors the tile images refer to.</param>
@@ -146,7 +176,7 @@ public sealed class CdgEncoder
         int written = 0;
         for (int tileIndex = 0; tileIndex < CdgFormat.TileCount; tileIndex++)
         {
-            if (_screen.TileEquals(tileIndex, heldBack))
+            if (!IsWorthRedrawing(tileIndex, heldBack))
             {
                 continue;
             }
@@ -224,6 +254,37 @@ public sealed class CdgEncoder
         }
     }
 
+    /// <summary>
+    /// Returns whether a tile of the frame differs from the screen by enough to be drawn, either by a clear
+    /// margin or because it has wanted redrawing for long enough. This does not count towards the run.
+    /// </summary>
+    private bool IsWorthRedrawing(int tileIndex, CdgTileImage frame)
+    {
+        long gain = GetRedrawGain(tileIndex, frame);
+        return gain >= MinimumRedrawGain ||
+            (gain > 0 && _staleFrameCounts[tileIndex] + 1 >= StaleFrameLimit);
+    }
+
+    /// <summary>
+    /// Returns how much closer to the frame's source pixels the frame's drawing of a tile comes than the
+    /// screen does: zero or less when redrawing it would not help, and <see cref="long.MaxValue"/> for any
+    /// difference when the frame carries no source pixels to measure against.
+    /// </summary>
+    private long GetRedrawGain(int tileIndex, CdgTileImage frame)
+    {
+        if (_screen.TileEquals(tileIndex, frame))
+        {
+            return 0;
+        }
+
+        if (!frame.HasSource)
+        {
+            return long.MaxValue;
+        }
+
+        return frame.GetTileError(tileIndex, _screen, _palette) - frame.GetTileError(tileIndex, frame, _palette);
+    }
+
     private static long GetPacketIndex(TimeSpan timestamp) =>
         (long)(timestamp.TotalSeconds * CdgFormat.PacketsPerSecond);
 
@@ -256,11 +317,19 @@ public sealed class CdgEncoder
                 return;
             }
 
-            if (_screen.TileEquals(tileIndex, frame))
+            long gain = GetRedrawGain(tileIndex, frame);
+            if (gain <= 0)
+            {
+                _staleFrameCounts[tileIndex] = 0;
+                continue;
+            }
+
+            if (gain < MinimumRedrawGain && ++_staleFrameCounts[tileIndex] < StaleFrameLimit)
             {
                 continue;
             }
 
+            _staleFrameCounts[tileIndex] = 0;
             bool hasFirstPass = !_screen.HasXorPass(tileIndex) &&
                 _screen.TileEquals(
                     tileIndex,

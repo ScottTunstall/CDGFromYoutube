@@ -77,6 +77,63 @@ public sealed class CdgEncoderTests : IDisposable
     }
 
     [Fact]
+    public void ATileThatOnlyMovesToANearlyIdenticalColorIsNotRedrawn()
+    {
+        CdgEncoder encoder = CreateEncoderWithNearWhite(TimeSpan.FromSeconds(4));
+        encoder.WritePrologue();
+
+        encoder.WriteFrame(TimeSpan.Zero, CreateSourcedTile(WhiteIndex));
+        encoder.WriteFrame(TimeSpan.FromSeconds(1), CreateSourcedTile(NearWhiteIndex));
+        long afterFirstFrame = encoder.PacketsWritten;
+        encoder.WriteFrame(TimeSpan.FromSeconds(2), CreateSourcedTile(WhiteIndex));
+        encoder.WriteFrame(TimeSpan.FromSeconds(3), CreateSourcedTile(NearWhiteIndex));
+
+        // Only the first frame draws the tile; the frames that follow are only padding.
+        Assert.Equal(ProloguePacketCount + 1L, afterFirstFrame);
+        Assert.Equal(2L * CdgFormat.PacketsPerSecond, encoder.PacketsWritten);
+    }
+
+    [Fact]
+    public void ASmallDifferenceThatPersistsIsRedrawnOnce()
+    {
+        CdgEncoder encoder = CreateEncoderWithNearWhite(TimeSpan.FromSeconds(12));
+        encoder.WritePrologue();
+
+        encoder.WriteFrame(TimeSpan.Zero, CreateSourcedTile(WhiteIndex));
+        for (int second = 1; second <= 10; second++)
+        {
+            encoder.WriteFrame(TimeSpan.FromSeconds(second), CreateSourcedTile(NearWhiteIndex));
+        }
+
+        // The white tile, then the near white one after it has been wanted for six frames in a row.
+        byte[] packets = _stream.ToArray();
+        int tilePackets = 0;
+        for (int offset = 0; offset < packets.Length; offset += CdgFormat.PacketSizeBytes)
+        {
+            if (packets[offset + 1] == (byte)CdgInstruction.TileBlock)
+            {
+                tilePackets++;
+            }
+        }
+
+        Assert.Equal(2, tilePackets);
+    }
+
+    [Fact]
+    public void ATileThatReallyChangesIsRedrawnEvenWhenFramesCarryTheirSource()
+    {
+        CdgEncoder encoder = CreateEncoderWithNearWhite(TimeSpan.FromSeconds(3));
+        encoder.WritePrologue();
+
+        encoder.WriteFrame(TimeSpan.Zero, CreateSourcedTile(WhiteIndex));
+        encoder.WriteFrame(TimeSpan.FromSeconds(1), CreateSourcedTile(BlackIndex, tileIndex: 1));
+        encoder.WriteFrame(TimeSpan.FromSeconds(2), CreateSourcedTile(BlackIndex, tileIndex: 1));
+
+        // The second frame blanks the first tile and draws the second, which is two tiles.
+        Assert.Equal(CdgFormat.PacketsPerSecond + 2L, encoder.PacketsWritten);
+    }
+
+    [Fact]
     public void FramesThatCostMoreThanThePacketsBeforeThemAreDropped()
     {
         CdgEncoder encoder = CreateEncoder(TimeSpan.FromSeconds(10));
@@ -236,6 +293,42 @@ public sealed class CdgEncoderTests : IDisposable
         Array.Fill(colors, CdgColor.Black);
         colors[1] = new CdgColor(15, 15, 15);
         return new CdgPalette(colors);
+    }
+
+    private const byte BlackIndex = 0;
+    private const byte WhiteIndex = 1;
+    private const byte NearWhiteIndex = 2;
+
+    private CdgEncoder CreateEncoderWithNearWhite(TimeSpan duration)
+    {
+        CdgColor[] colors = new CdgColor[CdgFormat.ColorCount];
+        Array.Fill(colors, CdgColor.Black);
+        colors[WhiteIndex] = new CdgColor(15, 15, 15);
+        colors[NearWhiteIndex] = new CdgColor(15, 15, 14);
+        return new CdgEncoder(new CdgWriter(_stream), new CdgPalette(colors), duration);
+    }
+
+    /// <summary>
+    /// A frame whose only lit tile is filled with one color, carrying the source pixels it was reduced
+    /// from, as the tile encoder produces it. <paramref name="tileIndex"/> is lit in white when the color
+    /// is black, so the frame is not a clearing that the encoder would hold back.
+    /// </summary>
+    private static CdgTileImage CreateSourcedTile(byte color, int tileIndex = 0)
+    {
+        byte lit = color == BlackIndex ? WhiteIndex : color;
+        byte[] source = new byte[CdgFormat.PixelCount];
+        for (int y = 0; y < CdgFormat.TileHeight; y++)
+        {
+            for (int x = 0; x < CdgFormat.TileWidth; x++)
+            {
+                source[(y * CdgFormat.Width) + (tileIndex * CdgFormat.TileWidth) + x] = lit;
+            }
+        }
+
+        CdgTileImage image = new();
+        image.SetSource(source);
+        image.SetTile(tileIndex, lit, lit, new byte[CdgFormat.TileScanlineCount]);
+        return image;
     }
 
     private static CdgTileImage CreateFullScreenChange(byte color = 1, byte xorColor = 0)

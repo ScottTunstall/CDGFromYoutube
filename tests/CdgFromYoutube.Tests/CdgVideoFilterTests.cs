@@ -37,6 +37,7 @@ public sealed class CdgVideoFilterTests
         Assert.Contains("fps=15", filter, StringComparison.Ordinal);
         Assert.Contains($"scale={CdgFormat.Width}:{CdgFormat.Height}:force_original_aspect_ratio=decrease", filter, StringComparison.Ordinal);
         Assert.Contains($"pad={CdgFormat.Width}:{CdgFormat.Height}:(ow-iw)/2:(oh-ih)/2:color=black", filter, StringComparison.Ordinal);
+        Assert.Contains("eq=saturation=1.5", filter, StringComparison.Ordinal);
         Assert.Contains("format=rgb24", filter, StringComparison.Ordinal);
     }
 

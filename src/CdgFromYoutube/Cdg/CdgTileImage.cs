@@ -18,6 +18,69 @@ public sealed class CdgTileImage
     private readonly byte[] _tileScanlines = new byte[CdgFormat.TileCount * CdgFormat.TileScanlineCount];
     private readonly byte[] _xorColors = new byte[CdgFormat.TileCount];
     private readonly byte[] _xorScanlines = new byte[CdgFormat.TileCount * CdgFormat.TileScanlineCount];
+    private byte[]? _source;
+
+    /// <summary>
+    /// Whether the image carries the palette index of every source pixel it was reduced from, which is
+    /// what lets another drawing of a tile be measured against the same source.
+    /// </summary>
+    public bool HasSource => _source is not null;
+
+    /// <summary>Records the palette index of every pixel of the frame the tiles were reduced from.</summary>
+    /// <param name="paletteIndices">One palette index per pixel, row by row across the whole raster.</param>
+    public void SetSource(ReadOnlySpan<byte> paletteIndices)
+    {
+        if (paletteIndices.Length != CdgFormat.PixelCount)
+        {
+            throw new ArgumentException(
+                $"A frame holds {CdgFormat.PixelCount} pixels, but {paletteIndices.Length} were given.",
+                nameof(paletteIndices));
+        }
+
+        _source ??= new byte[CdgFormat.PixelCount];
+        paletteIndices.CopyTo(_source);
+    }
+
+    /// <summary>
+    /// Returns how far a tile of <paramref name="drawing"/> is from the source pixels of this image, in
+    /// squared four bit channel steps summed over the tile's pixels.
+    /// </summary>
+    public long GetTileError(int tileIndex, CdgTileImage drawing, CdgPalette palette)
+    {
+        ArgumentNullException.ThrowIfNull(drawing);
+        ArgumentNullException.ThrowIfNull(palette);
+        ValidateTileIndex(tileIndex);
+        if (_source is null)
+        {
+            throw new InvalidOperationException("The image carries no source pixels to measure against.");
+        }
+
+        (int row, int column) = Math.DivRem(tileIndex, CdgFormat.TileColumns);
+        byte color0 = drawing.GetColor0(tileIndex);
+        byte color1 = drawing.GetColor1(tileIndex);
+        byte xorColor = drawing.GetXorColor(tileIndex);
+        ReadOnlySpan<byte> scanlines = drawing.GetScanlines(tileIndex);
+        ReadOnlySpan<byte> xorScanlines = drawing.GetXorScanlines(tileIndex);
+
+        long error = 0;
+        for (int y = 0; y < CdgFormat.TileHeight; y++)
+        {
+            int rowStart = (((row * CdgFormat.TileHeight) + y) * CdgFormat.Width) + (column * CdgFormat.TileWidth);
+            for (int x = 0; x < CdgFormat.TileWidth; x++)
+            {
+                int bit = 1 << (CdgFormat.TileWidth - 1 - x);
+                byte drawn = (scanlines[y] & bit) != 0 ? color1 : color0;
+                if ((xorScanlines[y] & bit) != 0)
+                {
+                    drawn ^= xorColor;
+                }
+
+                error += palette.GetDistanceSquared(_source[rowStart + x], drawn);
+            }
+        }
+
+        return error;
+    }
 
     /// <summary>Returns the palette index of the color that pixels with a clear bit take.</summary>
     public byte GetColor0(int tileIndex) => _tileColors[tileIndex * CdgFormat.TileColorCount];

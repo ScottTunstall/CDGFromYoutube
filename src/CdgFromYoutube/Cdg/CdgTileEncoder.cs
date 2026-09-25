@@ -52,6 +52,7 @@ public sealed class CdgTileEncoder
         MapPixelsToPaletteIndices(rgbPixels);
 
         CdgTileImage image = new();
+        image.SetSource(_paletteIndices);
         Span<byte> scanlines = stackalloc byte[CdgFormat.TileScanlineCount];
         Span<byte> xorScanlines = stackalloc byte[CdgFormat.TileScanlineCount];
         for (int row = 0; row < CdgFormat.TileRows; row++)
