@@ -1,6 +1,6 @@
 # CDGFromYoutube
 
-Converts a YouTube video into a karaoke pair: a `.cdg` (CD+G) graphics file and the matching `.mp3`.
+Converts a YouTube video into a karaoke format: a `.cdg` (CD+G) graphics file and the matching `.mp3`.
 Karaoke players such as Karafun pair the two up by file name, so both files are written with the same
 base name.
 
