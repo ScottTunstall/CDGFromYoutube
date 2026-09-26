@@ -133,6 +133,7 @@ why the defaults are what they are.
 | `--js-runtime <path>` | Path to Deno, the JavaScript runtime yt-dlp uses to reach some videos. |
 | `--download-tools` | Fetch yt-dlp, ffmpeg and Deno into the `tools` folder beside the program when they cannot be found, without asking. |
 | `-h, --help` | Show the usage text. |
+| `-v, --version` | Show the program's version. |
 
 ## What the format allows, and why that matters
 
