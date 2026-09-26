@@ -10,6 +10,15 @@ public sealed class CommandLineParserTests
     [Fact]
     public void HelpIsRecognised() => Assert.True(CommandLineParser.Parse(["--help"]).HelpRequested);
 
+    [Theory]
+    [InlineData("-v")]
+    [InlineData("--version")]
+    public void VersionIsRecognised(string option) => Assert.True(CommandLineParser.Parse([option]).VersionRequested);
+
+    [Fact]
+    public void VersionIsNotRequestedByDefault() =>
+        Assert.False(CommandLineParser.Parse([VideoUrl]).VersionRequested);
+
     [Fact]
     public void ACommandLineWithoutAUrlIsRejected()
     {
