@@ -123,6 +123,7 @@ why the defaults are what they are.
 | `--mp3-sample-rate <hz>` | MP3 sample rate: one of 8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100 or 48000. Default: the highest of those that is no higher than the source rate. |
 | `--max-source-height <1-4320>` | Do not download a source video taller than this many pixels, which saves bandwidth when the output is only 216 pixels tall anyway. |
 | `--dither` | Mix the two colors inside a tile so gradients stop banding. |
+| `--antialias` | Draw lyrics with smooth edges, using shades of each lyric colour. For lyrics on a plain dark background only; a new page of lyrics takes about twice as long to appear in full. |
 | `--safe-area` | Keep the image inside the 288x192 area that every player shows. Default: use the whole 300x216 raster. |
 | `--crop <auto\|l,t,r,b>` | Cut the margins off the video before scaling it, so the lyrics are drawn bigger and less blocky. `auto` finds the area where the picture keeps changing, which is the lyrics; four numbers cut those percentages from the left, top, right and bottom. Default: no cropping. |
 | `--keep-temp` | Keep the downloaded video, and report where it is. |
@@ -239,6 +240,24 @@ The encoder works around these where it can:
   second pass that did not fit is added by a later frame for one packet. A third colour is only used when
   it cuts the tile's error by a set margin, so a few antialiased edge pixels do not trigger it. On a 3:48
   karaoke track this cut the highlighted lyric pixels drawn as black from 2.5% to 0.9%.
+* **Nearly grey pixels are made grey.** Compression tints the edges of white lettering faintly blue, green
+  or yellow, and the saturation boost strengthens that. The palette then held several slightly different
+  whites and white lyrics came out flecked with colour. Any pixel, and any palette entry, that is at most
+  30% saturated is now made exactly grey. Real lyric colours are far above that.
+* **`--antialias` draws smooth edges, for lyrics on a dark background.** The XOR pass can do more than
+  add one colour. Put a lyric colour's full shade, a third and two thirds at palette indices where the
+  two-thirds index is the XOR of the other two (1, 2, 3 or 4, 8, 12, for example), and a normal tile of
+  black and the full shade followed by an XOR tile of the third gives every pixel one of four levels. The
+  fifteen entries after black split into exactly five such ramps. So instead of median cut, the palette
+  finds up to five colours the lettering is drawn in, ignoring brightness, and gives each one a ramp.
+  Sharpening is turned off, since it removes the soft edges. The costs:
+  * Every tile of lettering takes two packets instead of one. First passes are still written before any
+    second pass, so a page shows up as quickly as before, just a little bolder, and softens as the second
+    passes arrive.
+  * The palette holds lyric shades, not the colours of a picture, so a video with a picture behind the
+    lyrics looks worse. That is why this is an option rather than the default.
+  * Thin strokes are drawn in their in-between shades instead of being rounded up, so lettering looks
+    slightly dimmer, especially coloured lettering.
 
 Dithering sounds like it should help, but it stays off unless `--dither` asks for it. Mixing the two
 colours of a tile softens gradients, but on that same track it measured worse against the source, and it
@@ -246,9 +265,9 @@ turns the edges of lettering, which is about one pixel thick at this size, into 
 
 An amplified difference image against the source shows where the remaining error sits: the background is
 pixel exact, and everything that is wrong is on the lettering itself, along its antialiased edges. That is
-limit 3 above and no encoder can get past it. Practically, if the blocks you see are in smooth areas such
-as a plasma background, `--dither` trades them for a fine pattern; if they are on the edges of letters,
-that is the format.
+limit 3 above. Practically, if the blocks you see are in smooth areas such as a plasma background,
+`--dither` trades them for a fine pattern; if they are on the edges of letters and the lyrics sit on a
+plain dark background, `--antialias` smooths them at the cost of a second packet per tile.
 
 The PowerShell scripts in `scripts/` help with this kind of checking:
 
