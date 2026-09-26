@@ -1,5 +1,7 @@
 # CDGFromYoutube
 
+>**Disclaimer:** Using this tool to create CDGs for profit or for illegal purposes is **PROHIBITED**. I will NOT be liable for any illegal activity resulting from the use of this tool.
+
 Converts a YouTube video into a karaoke format: a `.cdg` (CD+G) graphics file and the matching `.mp3`.
 Karaoke players such as Karafun pair the two up by file name, so both files are written with the same
 base name.
@@ -15,7 +17,14 @@ cdgfromyoutube "https://www.youtube.com/watch?v=..." -o "C:\Music\Karaoke"
    is missing, the .NET 10 runtime.
 2. Open a new Command Prompt (the installer only adds the program to the PATH other windows read at
    startup, so one open before you ran it won't see it).
-3. Run it against a video, the first time with `--download-tools` so it fetches yt-dlp and ffmpeg:
+3. Fetch the tools it needs, once, before converting anything:
+
+   ```console
+   cdgfromyoutube --download-tools
+   ```
+
+   Run it against a video, the first time with `--download-tools` so it fetches yt-dlp and ffmpeg if you
+   would rather do both in one step:
 
    ```console
    cdgfromyoutube "https://www.youtube.com/watch?v=..." --download-tools -o "C:\Music\Karaoke"
@@ -89,6 +98,13 @@ why the defaults are what they are.
   runs, and passes on yt-dlp's warnings about it.
 * `--download-tools` fetches whichever of the three are missing into `tools` in the current directory,
   which is the quickest way to get going:
+
+  ```console
+  cdgfromyoutube --download-tools
+  ```
+
+  Leave off the URL to only fetch the tools and set the system up; add one to fetch and convert in the
+  same step:
 
   ```console
   cdgfromyoutube "<url>" --download-tools -o output
