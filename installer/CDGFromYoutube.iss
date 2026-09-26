@@ -26,6 +26,10 @@ AppVersion={#MyAppVersion}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
+; Shows the license page with "I accept" / "I do not accept" radio buttons and refuses to let setup
+; continue past it until "I accept" is chosen - this is what makes the disclaimer a real gate rather
+; than just something shown and clicked past.
+LicenseFile=disclaimer.txt
 UninstallDisplayIcon={app}\{#MyAppExeName}
 OutputDir=Output
 OutputBaseFilename=CDGFromYoutubeSetup
