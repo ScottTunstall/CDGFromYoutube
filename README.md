@@ -2,9 +2,9 @@
 
 >**Disclaimer:** Using this tool to create CDGs for profit or for illegal purposes is **PROHIBITED**. I will NOT be liable for any illegal activity resulting from the use of this tool.
 
-Converts a YouTube video into a karaoke format: a `.cdg` (CD+G) graphics file and the matching `.mp3`.
-Karaoke players such as Karafun pair the two up by file name, so both files are written with the same
-base name.
+Turns a YouTube karaoke video into a proper karaoke file pair: a `.cdg` graphics file and the matching
+`.mp3`. Karaoke players such as KaraFun pick the two up automatically, because they share the same file
+name.
 
 ```console
 cdgfromyoutube "https://www.youtube.com/watch?v=..." -o "C:\Music\Karaoke"
@@ -13,35 +13,58 @@ cdgfromyoutube "https://www.youtube.com/watch?v=..." -o "C:\Music\Karaoke"
 ## Quick start
 
 1. Run the installer, `CDGFromYoutubeSetup.exe` (build it yourself from
-   [installer/](installer/README.md), or use one someone gave you). It installs the program and, if it
-   is missing, the .NET 10 runtime.
-2. Open a new Command Prompt (the installer only adds the program to the PATH other windows read at
-   startup, so one open before you ran it won't see it).
+   [installer/](installer/README.md), or use one someone gave you). It installs the program and, if it is
+   missing, the .NET runtime it needs.
+2. Open a new Command Prompt. (One that was already open won't see the change the installer just made, so
+   open a fresh one.)
 3. Convert a video:
 
    ```console
    cdgfromyoutube "https://www.youtube.com/watch?v=..." -o "C:\Music\Karaoke"
    ```
 
-   Replace the URL with a real YouTube video. The first time, it asks whether to download the tools it
-   needs (yt-dlp, ffmpeg and Deno); press Enter to say yes. They are kept in a `tools` folder in the
-   install folder, so this only happens once, whichever folder you run it from later. To fetch them up
-   front instead, without converting anything, run `cdgfromyoutube --download-tools`.
-4. Copy the `.cdg` and `.mp3` it wrote into your karaoke player's song folder. Most players, including
-   KaraFun, pick up the pair automatically because the file names match.
+   Replace the URL with a real YouTube video. The first time, it asks whether to download the extra tools
+   it needs; press Enter to say yes. That only happens once, however many times or folders you run it from
+   after that.
+4. Copy the `.cdg` and `.mp3` files it wrote into your karaoke player's song folder. Most players,
+   including KaraFun, pick up the pair automatically because the file names match.
 
-That's it. `-h` lists every other option, and `--crop auto` is worth trying if the lyrics come out small.
+That's it. Run `cdgfromyoutube -h` to see every other option, and try `--crop auto` if the lyrics come out
+small on screen (see "Getting the best results" below).
+
+## Getting the best results
+
+* **If the lyrics look small, add `--crop auto`.** Most karaoke videos only use part of the screen for the
+  words; this crops the rest away so the lyrics are drawn bigger and clearer.
+* **If the video is just lyrics on a plain dark background, add `--antialias`.** It smooths out the letters
+  so they look less blocky. It takes a little longer for a new line of lyrics to appear in full, which is
+  rarely noticeable.
+* **If you want crisp, flat-coloured lyrics instead, try `--flat-colours`.** It draws each lyric colour
+  solidly, with no shading, which suits some videos better than `--antialias` does. The letters can look a
+  little jagged on curves and diagonals as a trade-off.
+* **Fast-moving video, such as a real music video, will never look smooth.** This is a genuine limit of the
+  1980s karaoke graphics format this program targets, not a bug: it can redraw the whole screen only once
+  every three seconds. It's built for lyrics, slides and still pictures, which it handles very well; it was
+  never going to handle a car chase. See [docs/technical-details.md](docs/technical-details.md) if you want
+  to know exactly why.
+
+## What you need installed
+
+The installer handles all of this for you. If you'd rather build and run from source, you need:
+
+* **Windows**, and the **.NET 10 SDK**.
+* **yt-dlp** and **ffmpeg**, which do the actual downloading and video conversion. The program looks for
+  them next to itself, then on your `PATH`; if it can't find them, it offers to download them for you the
+  first time you run it (or run `cdgfromyoutube --download-tools` to fetch them up front).
+* **Deno**, a small JavaScript engine that yt-dlp sometimes needs to reach a video at all. It's optional,
+  but without it some videos may fail to download with an error mentioning "403 Forbidden". The tool
+  downloader above fetches this too.
 
 ## Building and running from source
 
-The installer is the easy way to run this program; everything below is instead for building and running
-it directly from this folder — the one holding `README.md` and `src/` — with no separate install step,
-on Windows with the .NET 10 SDK.
+Everything below is for building and running the program directly from this folder, with no installer.
 
-1. **Build and run once, fetching the tools it needs.** yt-dlp, ffmpeg, ffprobe and Deno are downloaded
-   into a `tools` folder next to the built program (under `src/CdgFromYoutube/bin/`) the first time, so
-   only the first run needs `--download-tools` (or a "yes" when it asks) and only the first run is slow
-   (ffmpeg is about 50 MB):
+1. **Build and run it once**, fetching the tools it needs the first time:
 
    ```console
    dotnet run --project src/CdgFromYoutube -- "https://www.youtube.com/watch?v=..." --download-tools -o output
@@ -50,331 +73,50 @@ on Windows with the .NET 10 SDK.
    Replace the URL with a real YouTube video. `-o output` writes the `.cdg` and `.mp3` into an `output`
    folder inside this one; use a full path such as `-o "C:\Music\Karaoke"` to write somewhere else.
 
-2. **Look at what it wrote.** `output` now holds a `.cdg` and an `.mp3` with the same base name, taken from
-   the video's title. Copy both into your karaoke player's song folder; most players, including KaraFun,
-   pick up the pair automatically because the names match.
+2. **Copy `.cdg` and `.mp3` from the `output` folder** into your karaoke player's song folder.
 
-3. **Run it again without downloading anything.** Once the `tools` folder holds the executables, drop
-   `--download-tools`:
+3. **Run it again without `--download-tools`** once the tools are there:
 
    ```console
    dotnet run --project src/CdgFromYoutube -- "https://www.youtube.com/watch?v=..." -o output
    ```
 
-   A Debug build, a Release build and a published `cdgfromyoutube.exe` each live in their own folder, so
-   each keeps its own `tools` folder and fetches the tools once for itself.
-
-4. **If the lyrics look small or blocky**, add `--crop auto` to fill more of the screen with them (see
-   "Graphics quality" below for what this trades off). If a video fails to download with
-   `HTTP Error 403: Forbidden`, that is what Deno is for; `--download-tools` should already have fetched
-   it, but see "What it needs" below if it did not.
-
-From here, `-h` lists every option, and the sections below explain what the format can and cannot do and
-why the defaults are what they are.
-
-## What it needs
-
-* Windows. The tools are looked for, and downloaded, as Windows executables (`yt-dlp.exe`, `ffmpeg.exe`,
-  `ffprobe.exe`, `deno.exe`).
-* The .NET 10 SDK to build it, or the published executable to run it. To build and run from source:
-
-  ```console
-  dotnet run --project src/CdgFromYoutube -- "<url>" -o output
-  ```
-
-* **yt-dlp** to download the video and **ffmpeg** (with **ffprobe**) to decode it. Unless a path is given
-  with `--yt-dlp` or `--ffmpeg`, each is looked for in this order: the `tools` folder beside the
-  executable, the folder the executable is in, and the `PATH`.
-  ffprobe is looked for beside ffmpeg first. If one is missing the program says so and names its `winget`
-  package (`yt-dlp.yt-dlp`, `Gyan.FFmpeg`).
-* **Deno** as a JavaScript runtime for yt-dlp. YouTube hides how to reach many of its videos behind a
-  JavaScript challenge; with no engine to solve it, yt-dlp either falls back to worse formats or the media
-  download is refused with `HTTP Error 403: Forbidden`. Deno is looked for in the same places as the other
-  tools, and `--js-runtime <path>` points at it explicitly. It is optional: without it the program still
-  runs, and passes on yt-dlp's warnings about it.
-* `--download-tools` fetches whichever of the three are missing into the `tools` folder beside the
-  executable, which is the quickest way to get going. Without it, a run given a URL asks before
-  downloading when yt-dlp or ffmpeg is missing (it only asks when run from a keyboard, not a script):
-
-  ```console
-  cdgfromyoutube --download-tools
-  ```
-
-  Leave off the URL to only fetch the tools and set the system up; add one to fetch and convert in the
-  same step:
-
-  ```console
-  cdgfromyoutube "<url>" --download-tools -o output
-  ```
-
-  yt-dlp and Deno come from their GitHub release pages, and ffmpeg and ffprobe from the Windows
-  "essentials" build that gyan.dev publishes (about 50 MB). They are downloaded from their project pages
-  and never bundled with this program. A failed Deno download is reported as a warning rather than
-  stopping the conversion.
-
-Every run prints the program's name and version first, such as `CDGFromYoutube (1.1.0)`, so a log or a
-bug report always says which build it came from.
+Run `cdgfromyoutube -h` (or `dotnet run --project src/CdgFromYoutube -- -h`) any time to see every option.
+Every run also prints the program's name and version first, such as `CDGFromYoutube (1.1.0)`, so a bug
+report can say which build it came from.
 
 ## Options
 
 | Option | Meaning |
 | --- | --- |
 | `-o, --output <folder>` | Where the `.cdg` and `.mp3` files are written. Default: the current folder. |
-| `-n, --name <name>` | Base name of the output files. Default: the video title. |
-| `--fps <1-60>` | Frames per second taken from the video. Default: 15. |
-| `--mp3-bitrate <8-320>` | MP3 bit rate in kbps. Default: 192. Reduced automatically if the sample rate cannot carry it. |
-| `--mp3-sample-rate <hz>` | MP3 sample rate: one of 8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100 or 48000. Default: the highest of those that is no higher than the source rate. |
-| `--max-source-height <1-4320>` | Download the tallest source video no taller than this many pixels, which saves bandwidth when the output is only 216 pixels tall anyway. If the video has nothing that short, the shortest version it has is used instead. For example, `--max-source-height 360` picks YouTube's 360p stream. |
-| `--dither` | Mix the two colours inside a tile so gradients stop banding. |
-| `--antialias` | Draw lyrics with smooth edges, using shades of each lyric colour. For lyrics on a plain dark background only; a new page of lyrics takes about twice as long to appear in full. Usually the best choice for a video that is mostly lyrics. |
-| `--flat-colours` | Draw each lyric colour as one solid colour, with no shades of it, so letters come out crisp rather than blotchy. For lyrics on a plain dark background only. Cannot be combined with `--antialias`. `--flat-colors` is accepted too. Without any shading, diagonal and curved strokes show a visible pixel staircase; `--antialias` avoids that at the cost of a second packet per tile. |
-| `--safe-area` | Keep the image inside the 288x192 area that every player shows. Default: use the whole 300x216 raster. |
-| `--crop <auto\|l,t,r,b>` | Cut the margins off the video before scaling it, so the lyrics are drawn bigger and less blocky. `auto` finds the area where the picture keeps changing, which is the lyrics; four numbers cut those percentages from the left, top, right and bottom. Default: no cropping. |
-| `--keep-temp` | Keep the downloaded video, and report where it is. |
-| `--ffmpeg <path>` | Path to ffmpeg. ffprobe is expected beside it. |
-| `--yt-dlp <path>` | Path to yt-dlp. |
-| `--js-runtime <path>` | Path to Deno, the JavaScript runtime yt-dlp uses to reach some videos. |
-| `--download-tools` | Fetch yt-dlp, ffmpeg and Deno into the `tools` folder beside the program when they cannot be found, without asking. |
-| `-h, --help` | Show the usage text. |
-| `-v, --version` | Show the program's version, on its own with nothing else, so a script can read it directly. |
+| `-n, --name <name>` | Base name of the output files. Default: the video's title. |
+| `--fps <1-60>` | How many pictures a second are taken from the video. Default: 15. Lower is faster to convert; it rarely changes how the result looks. |
+| `--mp3-bitrate <8-320>` | MP3 quality, in kbps. Default: 192, which is good enough that higher rarely helps. |
+| `--mp3-sample-rate <hz>` | MP3 sample rate. Default: matches the source, so you shouldn't normally need this. |
+| `--max-source-height <1-4320>` | Downloads a smaller version of the video when one is available, which is faster and uses less data. The output is tiny anyway, so there's rarely a reason to download more than, say, 360 or 480. |
+| `--dither` | Softens colour banding in gradients by blending colours together. Rarely needed for karaoke lyrics. |
+| `--antialias` | Smooths the edges of lyrics. See "Getting the best results" above. |
+| `--flat-colours` (or `--flat-colors`) | Draws lyrics in solid, flat colour instead of smoothed shading. See "Getting the best results" above. Cannot be used together with `--antialias`. |
+| `--safe-area` | Keeps the picture within the smaller area every player is guaranteed to show. Only worth trying if you notice the edges of the picture being cut off on your player. |
+| `--crop <auto\|l,t,r,b>` | Crops the video before resizing it, so the lyrics fill more of the screen. `auto` finds the lyrics automatically; see "Getting the best results" above. |
+| `--keep-temp` | Keeps the downloaded video instead of deleting it afterwards, and tells you where it is. |
+| `--ffmpeg <path>` | Use a specific copy of ffmpeg instead of searching for one. |
+| `--yt-dlp <path>` | Use a specific copy of yt-dlp instead of searching for one. |
+| `--js-runtime <path>` | Use a specific copy of Deno instead of searching for one. |
+| `--download-tools` | Fetch yt-dlp, ffmpeg and Deno without asking first, if any are missing. |
+| `-h, --help` | Show the built-in usage text. |
+| `-v, --version` | Show the program's version, on its own with nothing else, so a script can read it. |
 
-## What the format allows, and why that matters
+## More about how this works
 
-This is the part worth reading before judging the output.
-
-A CD+G player reads exactly **300 packets per second**, and each packet draws one **6x12 tile**. A whole
-screen is 900 tiles, so replacing everything on screen always takes **three seconds of playback**. That
-is the entire graphics budget of the format, and no amount of computer power changes it:
-
-* Material that changes little between frames — lyrics, titles, slides, a mostly still background —
-  converts beautifully and runs at the full frame rate.
-* Moving video can only be shown as a slow sequence of screens. The program spends the packets it has and
-  **drops any frame it cannot pay for**, then reports how many it dropped.
-* Frames that mostly **clear** the screen are **held back**. Karaoke videos wipe the lyric area before
-  drawing the next verse. Drawing that empty moment would spend the packets the next verse needs and leave
-  the screen black for seconds. So a frame that blanks at least 8 tiles, and blanks more tiles than it
-  draws, is skipped and the lines already on screen stay up. After 30 such frames in a row the picture
-  is drawn anyway, so a scene that really goes dark still does.
-
-At the end the program reports what happened to the frames:
-
-```text
-Graphics: <n> frames drawn, <n> dropped, <n> held back as states the picture passed through, which is <rate> frames a second over <hh:mm:ss>.
-```
-
-On a 19 second live action clip, 7 frames were drawn and 277 dropped, which is 0.37 frames a second.
-
-That is not a defect in this program; it is what a 28.8 kbit/s graphics channel does with video. What the
-program guarantees is that nothing drifts out of step with the audio:
-
-* Every frame is written at the packet index that matches its timestamp, padded with no-operation packets
-  where nothing has to change.
-* The file holds exactly `length x 300` packets, so the graphics stay aligned with the MP3 for the whole
-  track.
-
-`--fps` sets how often frames are offered, not how many survive. Lowering it saves decoding time.
-
-## Graphics quality, and where the artefacts come from
-
-Three limits of the format decide how close the picture can get to the video it came from:
-
-1. The raster is 300x216, so a 720p or 1080p source is scaled down by four or six. Small lettering that
-   was three or four pixels thick becomes about one pixel thick, surrounded by antialiased half shades.
-2. Only sixteen colours exist, chosen once for the whole track from frames sampled across it.
-3. A tile of 6x12 pixels may use **two** of those colours. This is the one that bites: a tile holding a
-   glyph edge must pick two colours for it, so an edge pixel lands on one or the other and the lettering
-   comes out with a stepped outline.
-
-Those are properties of CD+G rather than of this program. The instruction fields do have room for a bigger
-picture - a tile's row and column can address up to 384x384 pixels - but a conforming player keeps a
-300x216 buffer and drops anything outside it, so the extra room cannot be reached. (The 288x192 figure the
-format quotes is the display area; 300x216 is that area plus the one tile thick border around it, which is
-what `--safe-area` is about.) There is an extended standard, CD+EG (also called CD+XG and Extended
-TV-Graphics), offering up to 256 colours, but it saw almost no releases and no karaoke player implements it,
-so CD+G is the target here.
-
-The encoder works around these where it can:
-
-* **The tile's colours are chosen by scoring every pair** of palette entries against the tile's own colour
-  counts, not by taking the two most common colours. Choosing by frequency picks middling colours for a
-  tile that covers part of a gradient, which is what leaves a flat patch where the picture is smooth.
-* **The palette is chosen by median cut, with black reserved.** Entry 0 is always black. The other
-  fifteen come from splitting the sampled colours: the group holding the most pixels is split along its
-  widest channel at the point where half its pixels fall on each side, and each final group gives its
-  average colour. Colours dark enough to count as background (see below) are left out before the split,
-  so a track with a black background does not spend the table on near black entries.
-* **Colour is scaled at full resolution.** Video stores colour at half the width and height of its
-  brightness, and ffmpeg scales in that layout, so a 300x216 frame took its colour from a 150x108 one.
-  White lettering is carried by brightness and was unaffected, but coloured lettering is mostly colour: a
-  dark red is about a quarter as bright as white. Red strokes came out at half resolution, speckled with
-  dark gaps that the palette then spent several reds on. Frames are now converted to one colour value per
-  pixel (`yuv444p`) before they are scaled, and the red strokes on a karaoke track went from levels 4 to 11
-  of 15 across a single letter to a steady 13 or 14.
-* **The picture is sharpened after it is scaled.** Scaling to 300x216 turns thin lettering into a wash of
-  half shades. An unsharp mask (5x5, luma amount 0.8) pushes edge pixels back towards the colour they
-  belong to, so each tile's two colours have a clearer edge to follow.
-* **Colour is strengthened 1.5x after sharpening.** Video stores colour at a lower resolution than
-  brightness, so the edges of coloured lettering lose their colour and an orange letter is ringed with
-  dull browns and greys. Those used to take palette entries and show up as odd patches on the letters.
-  Boosting saturation pulls them back to the letter's colour and leaves white lettering alone. On a
-  karaoke track it cut these edge pixels from 8% of the lettering to 2%. It also makes live action video
-  look more saturated.
-* **Only tiles that change are written**, so a still picture costs nothing to hold and every packet goes to
-  the parts of the picture that moved. "Change" is measured against the source: a tile is only redrawn
-  when the new drawing comes closer to the source than what is on screen by a set margin. Without that,
-  compression noise flips edge pixels and swaps letters between near identical palette entries from frame
-  to frame, and unchanged lettering flickers. A smaller improvement that holds for 6 drawn frames in a row
-  is drawn anyway, so leftover pixels from a faded line and wrong pixels inside a letter are cleared
-  within about half a second. Noise comes and goes, so it never builds up a run like that.
-* **`--crop auto` makes the lyrics bigger.** The biggest cause of blocky lettering is how few pixels
-  each letter gets. A 16:9 video fitted into 300x216 leaves 48 rows empty, and the lyrics often use only the
-  middle two thirds of the width, so a line of lyrics was about 8 pixels tall. `--crop auto` samples the
-  video once a second, keeps the pixels that change in at least 4 samples (or 2% of them, if that is
-  more), and crops to the box around them with a 2% border. Lyrics are drawn, highlighted and cleared page
-  after page, so they change constantly; a logo that stays on screen never changes, and a title card changes
-  only briefly, so neither widens the box. On a 3:48 karaoke track the lyrics grew about 1.45x and filled the
-  screen. The costs: anything outside the lyrics, such as the ends of a wide title card, is cut off, and
-  bigger letters take more tiles, so a page change takes longer to draw.
-* **Everything dark is drawn as colour 0, the background.** Players such as KaraFun show their own backdrop
-  wherever the screen holds colour 0, so colour 0 behaves as transparent. Karaoke videos often put the
-  lyrics over a dim texture, and when that texture had palette entries of its own, the player drew each of
-  its tiles as an opaque dark block around the lyrics. Any colour with every channel at level 4 of 15 or
-  below (about 68 of 255) now becomes colour 0 and gets no palette entry. The cost is that very dark
-  detail in the video, such as a dim logo or black lettering, shows as the player's backdrop.
-  `scripts/render-cdg.ps1 -ShowTransparency` draws colour 0 in blue to show what a player will do.
-* **A tile that really needs a third colour gets one through an XOR pass.** Where the highlight is sweeping
-  across a word, one tile holds the background, the letters still to sing and the letters already sung.
-  With two colours the highlight had to go, and because it is nearer black than white, the word being sung
-  was drawn as a black block. The tile is now drawn with its best two colours and then an exclusive-or tile
-  (instruction 38) flips the pixels of the third. That costs a second packet, so it is only used where a
-  whole group of pixels would otherwise be wrong, and the second passes are written after every tile's first
-  pass and only with the packets left before the next frame: a new page goes up as fast as before, and any
-  second pass that did not fit is added by a later frame for one packet. A third colour is only used when
-  it cuts the tile's error by a set margin, so a few antialiased edge pixels do not trigger it. On a 3:48
-  karaoke track this cut the highlighted lyric pixels drawn as black from 2.5% to 0.9%.
-* **Nearly grey pixels are made grey.** Compression tints the edges of white lettering faintly blue, green
-  or yellow, and the saturation boost strengthens that. The palette then held several slightly different
-  whites and white lyrics came out flecked with colour. Any pixel, and any palette entry, that is at most
-  30% saturated is now made exactly grey. Real lyric colours are far above that.
-* **`--antialias` draws smooth edges, for lyrics on a dark background.** The XOR pass can do more than
-  add one colour. Put a lyric colour's full shade, a third and two thirds at palette indices where the
-  two-thirds index is the XOR of the other two (1, 2, 3 or 4, 8, 12, for example), and a normal tile of
-  black and the full shade followed by an XOR tile of the third gives every pixel one of four levels. The
-  fifteen entries after black split into exactly five such ramps. So instead of median cut, the palette
-  finds up to five colours the lettering is drawn in, ignoring brightness, and gives each one a ramp.
-  Sharpening is turned off, since it removes the soft edges. The costs:
-  * Every tile of lettering takes two packets instead of one. First passes are still written before any
-    second pass, so a page shows up as quickly as before, just a little bolder, and softens as the second
-    passes arrive.
-  * The palette holds lyric shades, not the colours of a picture, so a video with a picture behind the
-    lyrics looks worse. That is why this is an option rather than the default.
-  * Thin strokes are drawn in their in-between shades instead of being rounded up, so lettering looks
-    slightly dimmer, especially coloured lettering.
-
-* **`--flat-colours` draws each lyric colour as one solid colour.** Median cut spends entries where the
-  pixels are, and the edges of lettering are a large share of those, so one red lyric gets three or four
-  reds. A tile can only use two, so neighbouring tiles pick different reds and the lettering comes out
-  blotchy. This option finds the lyric colours the same way `--antialias` does, but gives each exactly one
-  entry, at the brightness the lettering reaches. Every pixel is then decided in two steps: first which
-  lyric colour its hue is nearest, then whether it is at least half as bright as that colour (lettering)
-  or not (background). The hue comes first because brightness alone is judged against the wrong colour:
-  the grey edge of a white letter, (7, 7, 7), is nearer a dark red (11, 1, 1) than it is to white or to
-  black, so drawing each pixel as its nearest entry would ring white lettering with red. Half brightness is
-  where a letter covered half of the pixel before scaling, so strokes keep their true thickness.
-  Sharpening and `--dither` are turned off, since both would put background pixels back into solid
-  strokes. The costs: a picture behind the lyrics is lost, the same as with `--antialias`'s palette, and
-  with no shading left to smooth a diagonal or curved stroke, its pixel staircase shows plainly. Try
-  `--antialias` first for a mostly-lyrics video; reach for `--flat-colours` when the extra packet per
-  tile is the more important cost to avoid.
-
-Dithering sounds like it should help, but it stays off unless `--dither` asks for it. Mixing the two
-colours of a tile softens gradients, but on that same track it measured worse against the source, and it
-turns the edges of lettering, which is about one pixel thick at this size, into visible speckle.
-
-An amplified difference image against the source shows where the remaining error sits: the background is
-pixel exact, and everything that is wrong is on the lettering itself, along its antialiased edges. That is
-limit 3 above. Practically, if the blocks you see are in smooth areas such as a plasma background,
-`--dither` trades them for a fine pattern; if they are on the edges of letters and the lyrics sit on a
-plain dark background, `--antialias` smooths them at the cost of a second packet per tile, and
-`--flat-colours` makes each letter one solid colour at no extra cost.
-
-The PowerShell scripts in `scripts/` help with this kind of checking:
-
-* `compare-cdg.ps1 -CdgPath -SourcePath -OutputDirectory -FfmpegPath` decodes the `.cdg` as a player
-  would and compares it with the source video once a second.
-* `render-cdg.ps1 -CdgPath -Seconds -OutputDirectory [-ShowTransparency]` writes the picture out at the
-  given moments, so it can be looked at without a karaoke player.
-* `measure-blackness.ps1 -ComparisonDirectory [-PixelStride]` measures how much blacker the `.cdg` is
-  than the source, using the output of `compare-cdg.ps1`. That is how a wiped lyric line left on screen
-  shows up.
-
-## How the conversion works
-
-1. **Download.** yt-dlp fetches the best video and audio into a temporary folder, merged into Matroska so
-   that any combination of codecs works. It prefers formats within `--max-source-height` when that is given, and
-   playlists are ignored, so only the one video is fetched.
-2. **Probe.** ffprobe reports the length, the video size, and the audio sample rate and channel count. The
-   conversion stops if there is no video, no audio, or no length.
-3. **Lyric area** (only with `--crop auto`). Frames sampled once a second at 320 pixels wide are compared
-   to find the area that keeps changing, and the crop margins are set from it.
-4. **Resolution rule.** Frames are cropped if asked, scaled into the raster with their shape preserved
-   (Lanczos, with colour at full resolution), sharpened (not with `--antialias` or `--flat-colours`),
-   boosted in saturation, and padded with black to 300x216 with the picture
-   centred. So widescreen video gains bars instead of being stretched. Anything larger than the raster is scaled down; anything smaller
-   is scaled up, because the raster is a fixed size. With `--safe-area` the picture is fitted into 288x192
-   instead.
-5. **Sample rate rule.** The MP3 uses the highest rate MP3 carries (8, 11.025, 12, 16, 22.05, 24, 32, 44.1
-   or 48 kHz) that is no higher than the source, so a source MP3 already carries keeps its rate and a
-   source above 48 kHz is reduced. The bit rate is reduced too if the chosen rate cannot carry it: at most
-   320 kbps from 32 kHz up, 160 kbps from 16 kHz, and 64 kbps below that.
-6. **Palette.** One sixteen colour palette is chosen for the whole track by median cut, from frames sampled
-   at one per second, with black reserved as entry 0. A fixed palette is what makes incremental drawing
-   possible: changing the colour table part way through would force every tile to be redrawn.
-7. **Tiles.** The file starts by clearing the screen, loading the colour table and clearing the border.
-   Each frame is then reduced to 6x12 tiles. A tile may only use two of the sixteen colours, so each tile is
-   rebuilt from the pair that best explains the pixels inside it, and the twelve scanline bytes say which
-   pixels take which of the two. Where a third colour is worth it, an XOR tile adds it. Only the tiles that
-   differ from what is already on screen, by enough to be worth it (see "Only tiles that change are
-   written" above), are written, which is why a still image costs nothing to hold.
-   Frames that mostly clear the screen are held back, and frames the packet budget cannot pay for are
-   dropped.
-8. **Audio.** ffmpeg decodes the audio to sixteen bit stereo PCM at the chosen rate, and LAME (through
-   NAudio.Lame) encodes it to MP3.
-9. **Finish.** The graphics stream is padded to exactly the length of the track and the temporary folder is
-   removed, unless `--keep-temp` was given.
-
-## Project layout
-
-```text
-src/CdgFromYoutube/
-  Cdg/          the packet format, colour table, palette building, tile encoding and packet budget
-  Imaging/      pixel layout, aspect fitting, cropping, lyric area detection and the ordered dither matrix
-  Media/        yt-dlp, ffprobe, ffmpeg and LAME: everything that touches the outside world
-  Tooling/      finding, and if asked, downloading the external tools
-  CommandLine/  options and the hand written argument parser
-  Pipeline/     the conversion itself, in the order it happens
-tests/CdgFromYoutube.Tests/
-scripts/       helpers for looking at the graphics and measuring them against the source
-```
-
-The CD+G details come from "CD+G Revealed" by Jim Bumgardner (https://jbum.com/cdg_revealed.html), checked
-against the CD+G decoder in VLC, which agrees on the tile size, the tile addressing and the colour table
-layout. The classes that depend on the format say so in their `<remarks>`.
+CD+G is a real, quite old karaoke format with some hard limits, and this program works around several of
+them to get the best picture it can out of it. If you're curious how, or you're looking to contribute,
+[docs/technical-details.md](docs/technical-details.md) covers the format's limits, how the picture is
+processed, the conversion pipeline step by step, the project's folder layout, and the test suite.
 
 ## Tests
 
 ```console
 dotnet test
 ```
-
-The xUnit suite covers the colour table packing, the packet writer, the tile encoding and its bit order,
-the packet budget with frame dropping and holding back, when a changed tile is worth redrawing, the
-palette reduction, the ffmpeg filter chain, cropping and lyric area detection, the ffprobe parsing, the MP3
-sample and bit rates, output file naming, the yt-dlp command line, and the program's own command line.
-
-## Checking a file yourself
-
-Every packet is 24 bytes: `0x09` in byte 0, the instruction in byte 1, and the instruction's data from byte
-4. A `.cdg` file therefore holds `length x 300` packets, and reading byte 1 of each one shows the shape of
-the file: 1 and 2 are the memory and border presets, 30 and 31 load the colour table, 6 draws a tile,
-38 draws a tile by XOR-ing it onto the screen, and 0 is a packet that carries no command at all.
