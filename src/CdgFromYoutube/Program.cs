@@ -46,17 +46,36 @@ if (parsed.Options is null)
 return await RunAsync(async () =>
 {
     KaraokeOptions options = parsed.Options;
+    bool downloadTools = options.DownloadTools
+        || (!ToolLocator.HasRequiredTools(options.FfmpegPath, options.YtDlpPath) && AskToDownloadTools());
+
     ToolPaths tools = await ToolLocator.LocateOrDownloadAsync(
         options.FfmpegPath,
         options.YtDlpPath,
         options.JavaScriptRuntimePath,
-        options.DownloadTools,
+        downloadTools,
         progress,
         cancellation.Token);
 
     KaraokePipeline pipeline = new(tools, progress);
     await pipeline.RunAsync(options, cancellation.Token);
 });
+
+// Only asks when someone is at the keyboard; a script or pipe gets the usual "not found" message instead.
+static bool AskToDownloadTools()
+{
+    if (Console.IsInputRedirected)
+    {
+        return false;
+    }
+
+    Console.Write(
+        "yt-dlp and ffmpeg are needed but were not found. Download them now into " +
+        $"'{ToolLocator.DefaultToolsDirectory}'? This only needs doing once. [Y/n] ");
+    string? answer = Console.ReadLine()?.Trim();
+    return answer is not null
+        && (answer.Length == 0 || answer.StartsWith('y') || answer.StartsWith('Y'));
+}
 
 async Task<int> RunAsync(Func<Task> action)
 {
