@@ -41,7 +41,7 @@ public sealed class KaraokeProgressReporter(IProgressSink progress)
 
         if (options.UseDither)
         {
-            progress.Detail("Mixing the two colors of each tile, so that gradients are drawn as a blend.");
+            progress.Detail("Mixing the two colours of each tile, so that gradients are drawn as a blend.");
         }
 
         progress.Detail(

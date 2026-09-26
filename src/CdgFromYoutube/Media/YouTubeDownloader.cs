@@ -20,10 +20,19 @@ public sealed class YouTubeDownloader(ExternalTool ytDlp, IProgressSink progress
     /// </summary>
     private const string MergeContainer = "mkv";
 
+    /// <summary>
+    /// Picks the first video stream and audio stream in yt-dlp's sort order, or the first stream that
+    /// carries both when the site offers no separate streams.
+    /// </summary>
+    private const string BestVideoAndAudio = "bv*+ba/b";
+
     /// <summary>Downloads the best video and audio the site offers for a URL.</summary>
     /// <param name="videoUrl">The address of the video.</param>
     /// <param name="destinationDirectory">The folder to download into.</param>
-    /// <param name="maximumSourceHeight">The tallest source worth downloading, or null for the best.</param>
+    /// <param name="maximumSourceHeight">
+    /// The tallest source worth downloading, or null for the best. When the video has nothing this short,
+    /// the shortest format it does have is taken instead.
+    /// </param>
     /// <param name="cancellationToken">Cancels the download.</param>
     public async Task<YouTubeDownload> DownloadAsync(
         Uri videoUrl,
@@ -56,11 +65,19 @@ public sealed class YouTubeDownloader(ExternalTool ytDlp, IProgressSink progress
             "--no-playlist",
             "--no-progress",
             "--merge-output-format", MergeContainer,
-            "--format", BuildFormatSelector(maximumSourceHeight),
+            "--format", BestVideoAndAudio,
             "--output", Path.Combine(destinationDirectory, $"{OutputFileName}.%(ext)s"),
             "--print", "after_move:%(title)s",
             "--print", "after_move:%(filepath)s",
         ];
+
+        // A sort rather than a filter, so that a video with nothing short enough still downloads: yt-dlp
+        // takes the tallest format within the limit, or the shortest above it when there is none.
+        if (maximumSourceHeight is int height)
+        {
+            arguments.Add("--format-sort");
+            arguments.Add($"res:{height}");
+        }
 
         if (javaScriptRuntimePath is not null)
         {
@@ -96,11 +113,6 @@ public sealed class YouTubeDownloader(ExternalTool ytDlp, IProgressSink progress
             }
         }
     }
-
-    private static string BuildFormatSelector(int? maximumSourceHeight) =>
-        maximumSourceHeight is int height
-            ? $"bv*[height<={height}]+ba/b[height<={height}]"
-            : "bv*+ba/b";
 
     private static YouTubeDownload ParseOutput(string standardOutput, string destinationDirectory)
     {

@@ -111,7 +111,7 @@ public sealed class CdgWriter(Stream stream)
         if (colors.Length != ColorTableEntriesPerPacket)
         {
             throw new ArgumentException(
-                $"A color table packet carries {ColorTableEntriesPerPacket} entries, but {colors.Length} were given.",
+                $"A colour table packet carries {ColorTableEntriesPerPacket} entries, but {colors.Length} were given.",
                 nameof(colors));
         }
 
@@ -147,7 +147,7 @@ public sealed class CdgWriter(Stream stream)
             throw new ArgumentOutOfRangeException(
                 nameof(colorIndex),
                 colorIndex,
-                $"A color table holds {CdgFormat.ColorCount} entries.");
+                $"A colour table holds {CdgFormat.ColorCount} entries.");
         }
     }
 

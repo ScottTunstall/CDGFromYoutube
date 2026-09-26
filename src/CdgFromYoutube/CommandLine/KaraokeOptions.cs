@@ -57,6 +57,21 @@ public sealed record KaraokeOptions
     /// </remarks>
     public bool Antialias { get; init; }
 
+    /// <summary>Whether each lyric color is drawn as one solid color, with no shades of it.</summary>
+    /// <remarks>
+    /// Off by default, because it suits lyrics over a plain dark background only: the palette holds just
+    /// black and the lyric colors, so a picture behind the lyrics is lost.
+    /// </remarks>
+    public bool FlatColors { get; init; }
+
+    /// <summary>Whether frames are sharpened after scaling, which only suits the palette built from the picture.</summary>
+    /// <remarks>
+    /// An antialiased palette wants the soft edges that sharpening removes, and a flat palette decides each
+    /// edge pixel by how much of it the letter covers, which the dark ring that sharpening leaves inside a
+    /// thin stroke would turn into holes.
+    /// </remarks>
+    public bool Sharpen => !Antialias && !FlatColors;
+
     /// <summary>Whether the image is kept inside the area that all players are guaranteed to show.</summary>
     public bool UseSafeArea { get; init; }
 

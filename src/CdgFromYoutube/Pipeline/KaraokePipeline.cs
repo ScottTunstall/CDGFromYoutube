@@ -58,7 +58,7 @@ public sealed class KaraokePipeline(ToolPaths tools, IProgressSink progress)
         string cdgPath = Path.Combine(options.OutputDirectory, baseName + ".cdg");
         string mp3Path = Path.Combine(options.OutputDirectory, baseName + ".mp3");
 
-        progress.Stage("Choosing the colors for the graphics...");
+        progress.Stage("Choosing the colours for the graphics...");
         CdgPalette palette = await graphics.BuildPaletteAsync(download.FilePath, options, cancellationToken)
             .ConfigureAwait(false);
 

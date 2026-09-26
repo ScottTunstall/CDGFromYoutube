@@ -21,6 +21,8 @@ public static class CommandLineParser
     private const string MaximumSourceHeightOption = "--max-source-height";
     private const string DitherOption = "--dither";
     private const string AntialiasOption = "--antialias";
+    private const string FlatColoursOption = "--flat-colours";
+    private const string FlatColorsOption = "--flat-colors";
     private const string SafeAreaOption = "--safe-area";
     private const string CropOption = "--crop";
     private const string AutoCropValue = "auto";
@@ -137,6 +139,12 @@ public static class CommandLineParser
                 state.Antialias = true;
                 return true;
 
+            // Both spellings are accepted, so that the option reads naturally either side of the Atlantic.
+            case FlatColoursOption:
+            case FlatColorsOption:
+                state.FlatColors = true;
+                return true;
+
             case KeepTemporaryFilesOption:
                 state.KeepTemporaryFiles = true;
                 return true;
@@ -200,6 +208,12 @@ public static class CommandLineParser
             throw new CommandLineException($"'{state.Url}' is not an http or https address.");
         }
 
+        if (state.Antialias && state.FlatColors)
+        {
+            throw new CommandLineException(
+                $"{AntialiasOption} and {FlatColoursOption} each choose how lyrics are coloured, so only one can be given.");
+        }
+
         return ParseResult.Success(new KaraokeOptions
         {
             VideoUrl = videoUrl,
@@ -211,6 +225,7 @@ public static class CommandLineParser
             MaximumSourceHeight = state.MaximumSourceHeight,
             UseDither = state.UseDither,
             Antialias = state.Antialias,
+            FlatColors = state.FlatColors,
             UseSafeArea = state.UseSafeArea,
             Crop = state.Crop,
             AutoCrop = state.AutoCrop,
@@ -316,6 +331,7 @@ public static class CommandLineParser
         public int? MaximumSourceHeight;
         public bool UseDither;
         public bool Antialias;
+        public bool FlatColors;
         public bool UseSafeArea;
         public CropMargins Crop = CropMargins.None;
         public bool AutoCrop;

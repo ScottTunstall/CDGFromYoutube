@@ -26,10 +26,13 @@ public static class HelpText
               --fps <1-{KaraokeOptions.MaximumVideoFrameRate}>               Frames per second taken from the video (default: {KaraokeOptions.DefaultVideoFrameRate})
               --mp3-bitrate <8-{Mp3SampleRate.Mpeg1MaximumBitRateKbps}>      MP3 bit rate in kilobits per second (default: {KaraokeOptions.DefaultMp3BitRateKbps})
               --mp3-sample-rate <hz>     MP3 sample rate (default: the source rate, reduced to suit MP3)
-              --max-source-height <px>   Do not download a source video taller than this
-              --dither                   Mix the two colors inside a tile to soften gradients
+              --max-source-height <px>   Prefer a source video no taller than this
+              --dither                   Mix the two colours inside a tile to soften gradients
               --antialias                Draw lyrics with smooth edges; for lyrics on a plain dark
                                          background, and a new page takes about twice as long to appear
+              --flat-colours             Draw each lyric colour as one solid colour, with no shades;
+                                         gives the crispest lettering, so try this first if the video
+                                         is mostly lyrics on a plain dark background
               --safe-area                Keep the image inside the 288x192 area that all players show
               --crop <auto|l,t,r,b>      Crop to the lyrics (auto), or cut these percentages from
                                          the left, top, right and bottom, so the lyrics are drawn bigger

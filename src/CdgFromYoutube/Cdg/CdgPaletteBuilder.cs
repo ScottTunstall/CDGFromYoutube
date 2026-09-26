@@ -41,7 +41,7 @@ public static class CdgPaletteBuilder
         if (reservedColors.Count > CdgFormat.ColorCount)
         {
             throw new ArgumentException(
-                $"A CD+G palette holds {CdgFormat.ColorCount} colors, so fewer can be reserved.",
+                $"A CD+G palette holds {CdgFormat.ColorCount} colours, so fewer can be reserved.",
                 nameof(reservedColors));
         }
 

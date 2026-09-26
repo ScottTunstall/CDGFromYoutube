@@ -38,6 +38,9 @@ public static class CdgVideoFilter
     /// </remarks>
     private const double Saturation = 1.5;
 
+    /// <summary>The pixel format that keeps a color value for every pixel, which the frames are scaled in.</summary>
+    private const string FullColorFormat = "format=yuv444p";
+
     /// <summary>Returns the area of the raster that the image is fitted into.</summary>
     /// <param name="useSafeArea">Whether to stay inside the area that all players are guaranteed to show.</param>
     public static FrameSize GetRasterSize(bool useSafeArea) => useSafeArea
@@ -61,6 +64,13 @@ public static class CdgVideoFilter
         {
             filters.Add(crop.ToFfmpegFilter());
         }
+
+        // Video stores its color at half the width and height of its brightness, and a scale keeps that
+        // layout, so a 300x216 picture would get its color from a 150x108 one. Colored lettering is mostly
+        // color and little brightness (a dark red is about a quarter as bright as white), so its strokes
+        // came out at half resolution, speckled with dark gaps. Spreading the color to every pixel first
+        // lets the scale take it from the full source instead.
+        filters.Add(FullColorFormat);
 
         // The picture is centred, so that a picture narrower or shorter than the raster gains even bars.
         filters.Add(

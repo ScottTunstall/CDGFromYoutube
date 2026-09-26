@@ -50,24 +50,32 @@ public sealed class KaraokeGraphicsBuilder(ExternalTool ffmpeg, IProgressSink pr
                 AnalysisFramesPerSecond,
                 options.UseSafeArea,
                 options.Crop,
-                sharpen: !options.Antialias,
+                sharpen: options.Sharpen,
                 (_, rgbPixels) => histogram.AddFrame(rgbPixels),
                 cancellationToken)
             .ConfigureAwait(false);
 
         if (sampledFrames == 0)
         {
-            throw new KaraokeException("The video produced no frames to take colors from.");
+            throw new KaraokeException("The video produced no frames to take colours from.");
         }
 
         progress.Detail($"Sampled {sampledFrames} frames and {histogram.SampleCount} pixels.");
+        if (options.FlatColors)
+        {
+            CdgPalette flat = CdgFlatPaletteBuilder.Build(histogram);
+            int lyricColorCount = flat.Colors[1..].ToArray().Count(color => color != CdgColor.Black);
+            progress.Detail($"Drawing {lyricColorCount} flat lyric colour(s).");
+            return flat;
+        }
+
         if (!options.Antialias)
         {
             return CdgPaletteBuilder.Build(histogram, [CdgColor.Black]);
         }
 
         CdgPalette palette = CdgRampPaletteBuilder.Build(histogram);
-        progress.Detail($"Antialiasing with {palette.Ramps.Count} lyric color(s).");
+        progress.Detail($"Antialiasing with {palette.Ramps.Count} lyric colour(s).");
         return palette;
     }
 
@@ -94,7 +102,7 @@ public sealed class KaraokeGraphicsBuilder(ExternalTool ffmpeg, IProgressSink pr
                 options.VideoFrameRate,
                 options.UseSafeArea,
                 options.Crop,
-                sharpen: !options.Antialias,
+                sharpen: options.Sharpen,
                 (frameIndex, rgbPixels) =>
                 {
                     TimeSpan timestamp = TimeSpan.FromSeconds((double)frameIndex / options.VideoFrameRate);

@@ -98,6 +98,15 @@ public sealed class CdgTileEncoder
                     continue;
                 }
 
+                if (_palette.HasColorMap)
+                {
+                    // A mapped palette has already decided every color, and mixing would put background
+                    // pixels back into the lettering it made solid.
+                    _paletteIndices[pixel] = _palette.MapColor(color);
+                    pixel++;
+                    continue;
+                }
+
                 CdgPalette.NearestColors nearest = _palette.FindTwoNearest(color);
                 _paletteIndices[pixel] = _useDither
                     ? ChooseDitheredIndex(nearest, x, y)
