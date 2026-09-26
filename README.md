@@ -112,6 +112,9 @@ why the defaults are what they are.
   and never bundled with this program. A failed Deno download is reported as a warning rather than
   stopping the conversion.
 
+Every run prints the program's name and version first, such as `CDGFromYoutube (1.1.0)`, so a log or a
+bug report always says which build it came from.
+
 ## Options
 
 | Option | Meaning |
@@ -133,7 +136,7 @@ why the defaults are what they are.
 | `--js-runtime <path>` | Path to Deno, the JavaScript runtime yt-dlp uses to reach some videos. |
 | `--download-tools` | Fetch yt-dlp, ffmpeg and Deno into the `tools` folder beside the program when they cannot be found, without asking. |
 | `-h, --help` | Show the usage text. |
-| `-v, --version` | Show the program's version. |
+| `-v, --version` | Show the program's version, on its own with nothing else, so a script can read it directly. |
 
 ## What the format allows, and why that matters
 
