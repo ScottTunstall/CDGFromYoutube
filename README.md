@@ -50,42 +50,17 @@ small on screen (see "Getting the best results" below).
 ## What you need installed
 
 * **Windows.** Using the installer, that's all you need: it fetches the plain .NET 10 runtime for you if
-  your machine doesn't already have it. Building and running from source instead needs the full **.NET 10
-  SDK**, not just the runtime.
+  your machine doesn't already have it. 
 * **yt-dlp** and **ffmpeg**, which do the actual downloading and video conversion. Neither comes bundled
-  with the program. It looks for them next to itself, then on your `PATH`; if it can't find them, it
+  with the program. It looks for them in your app's install directory, then on your `PATH`; if it can't find them, it
   offers to download them for you the first time you run it (or run `cdgfromyoutube --download-tools` to
   fetch them up front).
 * **Deno**, a small JavaScript engine that yt-dlp sometimes needs to reach a video at all. It's optional,
   but without it some videos may fail to download with an error mentioning "403 Forbidden". The tool
   downloader above fetches this too.
 
-## Building and running from source
 
-Everything below is for building and running the program directly from this folder, with no installer.
-
-1. **Build and run it once**, fetching the tools it needs the first time:
-
-   ```console
-   dotnet run --project src/CdgFromYoutube -- "https://www.youtube.com/watch?v=..." --download-tools -o output
-   ```
-
-   Replace the URL with a real YouTube video. `-o output` writes the `.cdg` and `.mp3` into an `output`
-   folder inside this one; use a full path such as `-o "C:\Music\Karaoke"` to write somewhere else.
-
-2. **Copy `.cdg` and `.mp3` from the `output` folder** into your karaoke player's song folder.
-
-3. **Run it again without `--download-tools`** once the tools are there:
-
-   ```console
-   dotnet run --project src/CdgFromYoutube -- "https://www.youtube.com/watch?v=..." -o output
-   ```
-
-Run `cdgfromyoutube -h` (or `dotnet run --project src/CdgFromYoutube -- -h`) any time to see every option.
-Every run also prints the program's name and version first, such as `CDGFromYoutube (1.1.0)`, so a bug
-report can say which build it came from.
-
-## Options
+## Command Line Options
 
 | Option | Meaning |
 | --- | --- |
@@ -115,8 +90,3 @@ them to get the best picture it can out of it. If you're curious how, or you're 
 [docs/technical-details.md](docs/technical-details.md) covers the format's limits, how the picture is
 processed, the conversion pipeline step by step, the project's folder layout, and the test suite.
 
-## Tests
-
-```console
-dotnet test
-```
