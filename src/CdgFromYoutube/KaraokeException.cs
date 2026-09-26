@@ -8,6 +8,11 @@ namespace CdgFromYoutube;
 /// </remarks>
 public class KaraokeException : Exception
 {
+    /// <summary>Creates an exception with no message.</summary>
+    public KaraokeException()
+    {
+    }
+
     /// <summary>Creates an exception that carries a user facing message.</summary>
     public KaraokeException(string message)
         : base(message)

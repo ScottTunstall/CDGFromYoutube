@@ -17,6 +17,23 @@ if (parsed.HelpRequested)
     return 0;
 }
 
+ConsoleProgressSink progress = new();
+
+if (parsed.ToolSetup is not null)
+{
+    return await RunAsync(async () =>
+    {
+        await ToolLocator.LocateOrDownloadAsync(
+            parsed.ToolSetup.FfmpegPath,
+            parsed.ToolSetup.YtDlpPath,
+            parsed.ToolSetup.JavaScriptRuntimePath,
+            allowDownload: true,
+            progress,
+            cancellation.Token);
+        Console.WriteLine("Tools are ready.");
+    });
+}
+
 if (parsed.Options is null)
 {
     Console.Error.WriteLine(parsed.Error);
@@ -26,9 +43,7 @@ if (parsed.Options is null)
     return 1;
 }
 
-ConsoleProgressSink progress = new();
-
-try
+return await RunAsync(async () =>
 {
     KaraokeOptions options = parsed.Options;
     ToolPaths tools = await ToolLocator.LocateOrDownloadAsync(
@@ -41,15 +56,23 @@ try
 
     KaraokePipeline pipeline = new(tools, progress);
     await pipeline.RunAsync(options, cancellation.Token);
-    return 0;
-}
-catch (OperationCanceledException)
+});
+
+async Task<int> RunAsync(Func<Task> action)
 {
-    Console.Error.WriteLine("Cancelled.");
-    return 130;
-}
-catch (KaraokeException exception)
-{
-    Console.Error.WriteLine(exception.Message);
-    return 1;
+    try
+    {
+        await action();
+        return 0;
+    }
+    catch (OperationCanceledException)
+    {
+        Console.Error.WriteLine("Cancelled.");
+        return 130;
+    }
+    catch (KaraokeException exception)
+    {
+        Console.Error.WriteLine(exception.Message);
+        return 1;
+    }
 }
