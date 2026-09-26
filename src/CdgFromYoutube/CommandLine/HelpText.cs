@@ -35,10 +35,12 @@ public static class HelpText
               --ffmpeg <path>            Path to ffmpeg; ffprobe is expected beside it
               --yt-dlp <path>            Path to yt-dlp
               --js-runtime <path>        Path to Deno, which yt-dlp uses to reach some videos
-              --download-tools           Fetch yt-dlp, ffmpeg and Deno into ./tools when they are missing
+              --download-tools           Fetch yt-dlp, ffmpeg and Deno into the program's tools folder
+                                         when they are missing, without asking first
           -h, --help                     Show this text
 
           Run with just --download-tools and no URL to fetch the tools without converting a video.
+          The tools are fetched once and kept next to the program, so later runs from any folder find them.
 
         Notes:
           A player reads exactly {CdgFormat.PacketsPerSecond} packets per second, and a whole screen is {CdgFormat.TileCount} tiles, so
