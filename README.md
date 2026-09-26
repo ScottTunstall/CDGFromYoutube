@@ -49,12 +49,13 @@ small on screen (see "Getting the best results" below).
 
 ## What you need installed
 
-The installer handles all of this for you. If you'd rather build and run from source, you need:
-
-* **Windows**, and the **.NET 10 SDK**.
-* **yt-dlp** and **ffmpeg**, which do the actual downloading and video conversion. The program looks for
-  them next to itself, then on your `PATH`; if it can't find them, it offers to download them for you the
-  first time you run it (or run `cdgfromyoutube --download-tools` to fetch them up front).
+* **Windows.** Using the installer, that's all you need: it fetches the plain .NET 10 runtime for you if
+  your machine doesn't already have it. Building and running from source instead needs the full **.NET 10
+  SDK**, not just the runtime.
+* **yt-dlp** and **ffmpeg**, which do the actual downloading and video conversion. Neither comes bundled
+  with the program. It looks for them next to itself, then on your `PATH`; if it can't find them, it
+  offers to download them for you the first time you run it (or run `cdgfromyoutube --download-tools` to
+  fetch them up front).
 * **Deno**, a small JavaScript engine that yt-dlp sometimes needs to reach a video at all. It's optional,
   but without it some videos may fail to download with an error mentioning "403 Forbidden". The tool
   downloader above fetches this too.
