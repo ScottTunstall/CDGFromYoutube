@@ -1,8 +1,8 @@
 namespace CdgFromYoutube.Tooling;
 
 /// <summary>
-/// Finds yt-dlp, ffmpeg and ffprobe, either from the command line, from a folder next to this program, from
-/// a <c>tools</c> folder beside it, from the PATH, or by downloading them.
+/// Finds yt-dlp, ffmpeg and ffprobe, either from the command line, from the <c>tools</c> folder next to this
+/// program, from the program's own folder, from the PATH, or by downloading them.
 /// </summary>
 public static class ToolLocator
 {
@@ -19,7 +19,18 @@ public static class ToolLocator
     public const string DenoFileName = "deno.exe";
 
     /// <summary>The folder that downloads land in and that searches look at first.</summary>
-    public static string DefaultToolsDirectory => Path.Combine(Environment.CurrentDirectory, "tools");
+    /// <remarks>
+    /// It sits next to the program rather than in the current folder, so the tools are fetched once and
+    /// found again whichever folder the program is later run from. The installer makes this folder writable
+    /// by ordinary users, because the program itself lives under Program Files.
+    /// </remarks>
+    public static string DefaultToolsDirectory => Path.Combine(AppContext.BaseDirectory, "tools");
+
+    /// <summary>Whether yt-dlp and ffmpeg, the two tools a conversion cannot do without, can be found.</summary>
+    /// <param name="ffmpegPath">A path given on the command line, or <see langword="null"/> to search.</param>
+    /// <param name="ytDlpPath">A path given on the command line, or <see langword="null"/> to search.</param>
+    public static bool HasRequiredTools(string? ffmpegPath, string? ytDlpPath) =>
+        FindTool(FfmpegFileName, ffmpegPath) is not null && FindTool(YtDlpFileName, ytDlpPath) is not null;
 
     /// <summary>
     /// Locates the tools, downloading the missing ones when <paramref name="allowDownload"/> is set.
@@ -46,24 +57,35 @@ public static class ToolLocator
 
         if (allowDownload && (ffmpeg is null || ytDlp is null || javaScriptRuntime is null))
         {
-            Directory.CreateDirectory(DefaultToolsDirectory);
-            ToolDownloader downloader = new(progress);
-            if (ytDlp is null)
+            try
             {
-                await downloader.DownloadYtDlpAsync(DefaultToolsDirectory, cancellationToken).ConfigureAwait(false);
-                ytDlp = FindTool(YtDlpFileName, null);
-            }
+                Directory.CreateDirectory(DefaultToolsDirectory);
+                ToolDownloader downloader = new(progress);
+                if (ytDlp is null)
+                {
+                    await downloader.DownloadYtDlpAsync(DefaultToolsDirectory, cancellationToken).ConfigureAwait(false);
+                    ytDlp = FindTool(YtDlpFileName, null);
+                }
 
-            if (ffmpeg is null)
-            {
-                await downloader.DownloadFFmpegAsync(DefaultToolsDirectory, cancellationToken).ConfigureAwait(false);
-                ffmpeg = FindTool(FfmpegFileName, null);
-            }
+                if (ffmpeg is null)
+                {
+                    await downloader.DownloadFFmpegAsync(DefaultToolsDirectory, cancellationToken).ConfigureAwait(false);
+                    ffmpeg = FindTool(FfmpegFileName, null);
+                }
 
-            if (javaScriptRuntime is null)
+                if (javaScriptRuntime is null)
+                {
+                    await TryDownloadJavaScriptRuntimeAsync(downloader, progress, cancellationToken).ConfigureAwait(false);
+                    javaScriptRuntime = FindTool(DenoFileName, null);
+                }
+            }
+            catch (UnauthorizedAccessException exception)
             {
-                await TryDownloadJavaScriptRuntimeAsync(downloader, progress, cancellationToken).ConfigureAwait(false);
-                javaScriptRuntime = FindTool(DenoFileName, null);
+                throw new KaraokeException(
+                    $"The tools could not be saved to '{DefaultToolsDirectory}' because that folder is not " +
+                    "writable. Reinstall the program, or run this once from a Command Prompt opened with " +
+                    "'Run as administrator'.",
+                    exception);
             }
         }
 
@@ -179,13 +201,12 @@ public static class ToolLocator
     {
         yield return DefaultToolsDirectory;
         yield return AppContext.BaseDirectory;
-        yield return Path.Combine(AppContext.BaseDirectory, "tools");
     }
 
     private static string MissingToolMessage(string fileName, string wingetPackageId) => $"""
         {fileName} was not found.
         Install it with      winget install {wingetPackageId}
-        or place it in 'tools' next to this program, or on the PATH.
+        or place it in '{DefaultToolsDirectory}', or on the PATH.
         Pass --download-tools to fetch yt-dlp and ffmpeg into '{DefaultToolsDirectory}'.
         """;
 }
