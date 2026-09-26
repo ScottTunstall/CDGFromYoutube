@@ -50,6 +50,7 @@ public sealed class KaraokeGraphicsBuilder(ExternalTool ffmpeg, IProgressSink pr
                 AnalysisFramesPerSecond,
                 options.UseSafeArea,
                 options.Crop,
+                sharpen: !options.Antialias,
                 (_, rgbPixels) => histogram.AddFrame(rgbPixels),
                 cancellationToken)
             .ConfigureAwait(false);
@@ -60,7 +61,14 @@ public sealed class KaraokeGraphicsBuilder(ExternalTool ffmpeg, IProgressSink pr
         }
 
         progress.Detail($"Sampled {sampledFrames} frames and {histogram.SampleCount} pixels.");
-        return CdgPaletteBuilder.Build(histogram, [CdgColor.Black]);
+        if (!options.Antialias)
+        {
+            return CdgPaletteBuilder.Build(histogram, [CdgColor.Black]);
+        }
+
+        CdgPalette palette = CdgRampPaletteBuilder.Build(histogram);
+        progress.Detail($"Antialiasing with {palette.Ramps.Count} lyric color(s).");
+        return palette;
     }
 
     /// <summary>Encodes the video as CD+G graphics timed against <paramref name="duration"/>.</summary>
@@ -86,6 +94,7 @@ public sealed class KaraokeGraphicsBuilder(ExternalTool ffmpeg, IProgressSink pr
                 options.VideoFrameRate,
                 options.UseSafeArea,
                 options.Crop,
+                sharpen: !options.Antialias,
                 (frameIndex, rgbPixels) =>
                 {
                     TimeSpan timestamp = TimeSpan.FromSeconds((double)frameIndex / options.VideoFrameRate);
