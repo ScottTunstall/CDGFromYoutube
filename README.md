@@ -17,21 +17,16 @@ cdgfromyoutube "https://www.youtube.com/watch?v=..." -o "C:\Music\Karaoke"
    is missing, the .NET 10 runtime.
 2. Open a new Command Prompt (the installer only adds the program to the PATH other windows read at
    startup, so one open before you ran it won't see it).
-3. Fetch the tools it needs, once, before converting anything:
+3. Convert a video:
 
    ```console
-   cdgfromyoutube --download-tools
+   cdgfromyoutube "https://www.youtube.com/watch?v=..." -o "C:\Music\Karaoke"
    ```
 
-   Run it against a video, the first time with `--download-tools` so it fetches yt-dlp and ffmpeg if you
-   would rather do both in one step:
-
-   ```console
-   cdgfromyoutube "https://www.youtube.com/watch?v=..." --download-tools -o "C:\Music\Karaoke"
-   ```
-
-   Replace the URL with a real YouTube video. This only needs to be done once; later runs can drop
-   `--download-tools`.
+   Replace the URL with a real YouTube video. The first time, it asks whether to download the tools it
+   needs (yt-dlp, ffmpeg and Deno); press Enter to say yes. They are kept in a `tools` folder in the
+   install folder, so this only happens once, whichever folder you run it from later. To fetch them up
+   front instead, without converting anything, run `cdgfromyoutube --download-tools`.
 4. Copy the `.cdg` and `.mp3` it wrote into your karaoke player's song folder. Most players, including
    KaraFun, pick up the pair automatically because the file names match.
 
@@ -44,8 +39,9 @@ it directly from this folder — the one holding `README.md` and `src/` — with
 on Windows with the .NET 10 SDK.
 
 1. **Build and run once, fetching the tools it needs.** yt-dlp, ffmpeg, ffprobe and Deno are downloaded
-   into `tools/` in the current directory the first time, so only the first run needs `--download-tools`
-   and only the first run is slow (ffmpeg is about 50 MB):
+   into a `tools` folder next to the built program (under `src/CdgFromYoutube/bin/`) the first time, so
+   only the first run needs `--download-tools` (or a "yes" when it asks) and only the first run is slow
+   (ffmpeg is about 50 MB):
 
    ```console
    dotnet run --project src/CdgFromYoutube -- "https://www.youtube.com/watch?v=..." --download-tools -o output
@@ -58,15 +54,15 @@ on Windows with the .NET 10 SDK.
    the video's title. Copy both into your karaoke player's song folder; most players, including KaraFun,
    pick up the pair automatically because the names match.
 
-3. **Run it again without downloading anything.** Once `tools/` holds the executables, drop
+3. **Run it again without downloading anything.** Once the `tools` folder holds the executables, drop
    `--download-tools`:
 
    ```console
    dotnet run --project src/CdgFromYoutube -- "https://www.youtube.com/watch?v=..." -o output
    ```
 
-   If you build a standalone `cdgfromyoutube.exe` instead (`dotnet publish`), it looks for `tools/` beside
-   itself as well as in the current directory, so the same `tools/` folder works for both.
+   A Debug build, a Release build and a published `cdgfromyoutube.exe` each live in their own folder, so
+   each keeps its own `tools` folder and fetches the tools once for itself.
 
 4. **If the lyrics look small or blocky**, add `--crop auto` to fill more of the screen with them (see
    "Graphics quality" below for what this trades off). If a video fails to download with
@@ -87,8 +83,8 @@ why the defaults are what they are.
   ```
 
 * **yt-dlp** to download the video and **ffmpeg** (with **ffprobe**) to decode it. Unless a path is given
-  with `--yt-dlp` or `--ffmpeg`, each is looked for in this order: a `tools` folder in the current
-  directory, the folder the executable is in, a `tools` folder beside the executable, and the `PATH`.
+  with `--yt-dlp` or `--ffmpeg`, each is looked for in this order: the `tools` folder beside the
+  executable, the folder the executable is in, and the `PATH`.
   ffprobe is looked for beside ffmpeg first. If one is missing the program says so and names its `winget`
   package (`yt-dlp.yt-dlp`, `Gyan.FFmpeg`).
 * **Deno** as a JavaScript runtime for yt-dlp. YouTube hides how to reach many of its videos behind a
@@ -96,8 +92,9 @@ why the defaults are what they are.
   download is refused with `HTTP Error 403: Forbidden`. Deno is looked for in the same places as the other
   tools, and `--js-runtime <path>` points at it explicitly. It is optional: without it the program still
   runs, and passes on yt-dlp's warnings about it.
-* `--download-tools` fetches whichever of the three are missing into `tools` in the current directory,
-  which is the quickest way to get going:
+* `--download-tools` fetches whichever of the three are missing into the `tools` folder beside the
+  executable, which is the quickest way to get going. Without it, a run given a URL asks before
+  downloading when yt-dlp or ffmpeg is missing (it only asks when run from a keyboard, not a script):
 
   ```console
   cdgfromyoutube --download-tools
@@ -132,7 +129,7 @@ why the defaults are what they are.
 | `--ffmpeg <path>` | Path to ffmpeg. ffprobe is expected beside it. |
 | `--yt-dlp <path>` | Path to yt-dlp. |
 | `--js-runtime <path>` | Path to Deno, the JavaScript runtime yt-dlp uses to reach some videos. |
-| `--download-tools` | Fetch yt-dlp, ffmpeg and Deno into `./tools` when they cannot be found. |
+| `--download-tools` | Fetch yt-dlp, ffmpeg and Deno into the `tools` folder beside the program when they cannot be found, without asking. |
 | `-h, --help` | Show the usage text. |
 
 ## What the format allows, and why that matters
