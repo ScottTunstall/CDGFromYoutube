@@ -38,6 +38,8 @@ public static class HelpText
               --download-tools           Fetch yt-dlp, ffmpeg and Deno into ./tools when they are missing
           -h, --help                     Show this text
 
+          Run with just --download-tools and no URL to fetch the tools without converting a video.
+
         Notes:
           A player reads exactly {CdgFormat.PacketsPerSecond} packets per second, and a whole screen is {CdgFormat.TileCount} tiles, so
           replacing everything on screen takes three seconds. Frames that cannot be paid for out of the

@@ -7,7 +7,9 @@ namespace CdgFromYoutube.CommandLine;
 /// <summary>Reads the command line into <see cref="KaraokeOptions"/>.</summary>
 /// <remarks>
 /// The parser is written by hand rather than taken from a library, because the set of options is small and
-/// fixed and the messages can then name the option that is wrong and say what it expects.
+/// fixed and the messages can then name the option that is wrong and say what it expects. Options are split
+/// across two switches, <see cref="TryApplyOption"/> and <see cref="TryApplyMoreOptions"/>, purely to keep
+/// each one short; which switch an option is in has no other meaning.
 /// </remarks>
 public static class CommandLineParser
 {
@@ -45,153 +47,172 @@ public static class CommandLineParser
 
     private static ParseResult ParseCore(IReadOnlyList<string> arguments)
     {
-        string? url = null;
-        string? outputDirectory = null;
-        string? baseName = null;
-        int frameRate = KaraokeOptions.DefaultVideoFrameRate;
-        int bitRate = KaraokeOptions.DefaultMp3BitRateKbps;
-        int? sampleRate = null;
-        int? maximumSourceHeight = null;
-        bool useDither = false;
-        bool useSafeArea = false;
-        CropMargins crop = CropMargins.None;
-        bool autoCrop = false;
-        bool keepTemporaryFiles = false;
-        string? ffmpegPath = null;
-        string? ytDlpPath = null;
-        string? javaScriptRuntimePath = null;
-        bool downloadTools = false;
+        ParserState state = new();
 
         for (int index = 0; index < arguments.Count; index++)
         {
             string argument = arguments[index];
-            switch (argument)
+            if (argument is "-h" or HelpOption)
             {
-                case "-h" or HelpOption:
-                    return ParseResult.Help();
+                return ParseResult.Help();
+            }
 
-                case "-o" or OutputOption:
-                    outputDirectory = ReadValue(arguments, argument, ref index);
-                    break;
-
-                case "-n" or NameOption:
-                    baseName = ReadValue(arguments, argument, ref index);
-                    break;
-
-                case FrameRateOption:
-                    frameRate = ReadInteger(
-                        arguments,
-                        argument,
-                        ref index,
-                        KaraokeOptions.MinimumVideoFrameRate,
-                        KaraokeOptions.MaximumVideoFrameRate);
-                    break;
-
-                case BitRateOption:
-                    bitRate = ReadInteger(
-                        arguments,
-                        argument,
-                        ref index,
-                        Mp3SampleRate.MinimumBitRateKbps,
-                        Mp3SampleRate.Mpeg1MaximumBitRateKbps);
-                    break;
-
-                case SampleRateOption:
-                    sampleRate = ReadInteger(arguments, argument, ref index, 0, int.MaxValue);
-                    if (!Mp3SampleRate.IsSupported(sampleRate.Value))
-                    {
-                        throw new CommandLineException(
-                            $"{SampleRateOption} must be one of {string.Join(", ", Mp3SampleRate.Supported)}.");
-                    }
-
-                    break;
-
-                case MaximumSourceHeightOption:
-                    maximumSourceHeight = ReadInteger(
-                        arguments,
-                        argument,
-                        ref index,
-                        1,
-                        KaraokeOptions.MaximumSourceHeightPixels);
-                    break;
-
-                case DitherOption:
-                    useDither = true;
-                    break;
-
-                case SafeAreaOption:
-                    useSafeArea = true;
-                    break;
-
-                case CropOption:
-                    (crop, autoCrop) = ReadCrop(arguments, argument, ref index);
-                    break;
-
-                case KeepTemporaryFilesOption:
-                    keepTemporaryFiles = true;
-                    break;
-
-                case FfmpegOption:
-                    ffmpegPath = ReadValue(arguments, argument, ref index);
-                    break;
-
-                case YtDlpOption:
-                    ytDlpPath = ReadValue(arguments, argument, ref index);
-                    break;
-
-                case JavaScriptRuntimeOption:
-                    javaScriptRuntimePath = ReadValue(arguments, argument, ref index);
-                    break;
-
-                case DownloadToolsOption:
-                    downloadTools = true;
-                    break;
-
-                default:
-                    if (argument.StartsWith('-'))
-                    {
-                        throw new CommandLineException($"'{argument}' is not an option this program knows.");
-                    }
-
-                    if (url is not null)
-                    {
-                        throw new CommandLineException("Only one video URL can be converted at a time.");
-                    }
-
-                    url = argument;
-                    break;
+            if (!TryApplyOption(state, argument, arguments, ref index))
+            {
+                ApplyPositional(state, argument);
             }
         }
 
-        if (url is null)
+        return BuildResult(state);
+    }
+
+    /// <summary>The first half of the options. Falls through to <see cref="TryApplyMoreOptions"/>.</summary>
+    private static bool TryApplyOption(ParserState state, string argument, IReadOnlyList<string> arguments, ref int index)
+    {
+        switch (argument)
         {
+            case "-o" or OutputOption:
+                state.OutputDirectory = ReadValue(arguments, argument, ref index);
+                return true;
+
+            case "-n" or NameOption:
+                state.BaseName = ReadValue(arguments, argument, ref index);
+                return true;
+
+            case FrameRateOption:
+                state.FrameRate = ReadInteger(
+                    arguments,
+                    argument,
+                    ref index,
+                    KaraokeOptions.MinimumVideoFrameRate,
+                    KaraokeOptions.MaximumVideoFrameRate);
+                return true;
+
+            case BitRateOption:
+                state.BitRate = ReadInteger(
+                    arguments,
+                    argument,
+                    ref index,
+                    Mp3SampleRate.MinimumBitRateKbps,
+                    Mp3SampleRate.Mpeg1MaximumBitRateKbps);
+                return true;
+
+            case SampleRateOption:
+                state.SampleRate = ReadSampleRate(arguments, argument, ref index);
+                return true;
+
+            case MaximumSourceHeightOption:
+                state.MaximumSourceHeight = ReadInteger(
+                    arguments,
+                    argument,
+                    ref index,
+                    1,
+                    KaraokeOptions.MaximumSourceHeightPixels);
+                return true;
+
+            case DitherOption:
+                state.UseDither = true;
+                return true;
+
+            case SafeAreaOption:
+                state.UseSafeArea = true;
+                return true;
+
+            default:
+                return TryApplyMoreOptions(state, argument, arguments, ref index);
+        }
+    }
+
+    /// <summary>The second half of the options, tried once <see cref="TryApplyOption"/> finds no match.</summary>
+    private static bool TryApplyMoreOptions(ParserState state, string argument, IReadOnlyList<string> arguments, ref int index)
+    {
+        switch (argument)
+        {
+            case CropOption:
+                (state.Crop, state.AutoCrop) = ReadCrop(arguments, argument, ref index);
+                return true;
+
+            case KeepTemporaryFilesOption:
+                state.KeepTemporaryFiles = true;
+                return true;
+
+            case FfmpegOption:
+                state.FfmpegPath = ReadValue(arguments, argument, ref index);
+                return true;
+
+            case YtDlpOption:
+                state.YtDlpPath = ReadValue(arguments, argument, ref index);
+                return true;
+
+            case JavaScriptRuntimeOption:
+                state.JavaScriptRuntimePath = ReadValue(arguments, argument, ref index);
+                return true;
+
+            case DownloadToolsOption:
+                state.DownloadTools = true;
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private static void ApplyPositional(ParserState state, string argument)
+    {
+        if (argument.StartsWith('-'))
+        {
+            throw new CommandLineException($"'{argument}' is not an option this program knows.");
+        }
+
+        if (state.Url is not null)
+        {
+            throw new CommandLineException("Only one video URL can be converted at a time.");
+        }
+
+        state.Url = argument;
+    }
+
+    private static ParseResult BuildResult(ParserState state)
+    {
+        if (state.Url is null)
+        {
+            if (state.DownloadTools)
+            {
+                return ParseResult.ForToolSetup(new ToolSetupOptions
+                {
+                    FfmpegPath = state.FfmpegPath,
+                    YtDlpPath = state.YtDlpPath,
+                    JavaScriptRuntimePath = state.JavaScriptRuntimePath,
+                });
+            }
+
             throw new CommandLineException("A YouTube URL is needed.");
         }
 
-        if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? videoUrl) ||
+        if (!Uri.TryCreate(state.Url, UriKind.Absolute, out Uri? videoUrl) ||
             (videoUrl.Scheme != Uri.UriSchemeHttp && videoUrl.Scheme != Uri.UriSchemeHttps))
         {
-            throw new CommandLineException($"'{url}' is not an http or https address.");
+            throw new CommandLineException($"'{state.Url}' is not an http or https address.");
         }
 
         return ParseResult.Success(new KaraokeOptions
         {
             VideoUrl = videoUrl,
-            OutputDirectory = Path.GetFullPath(outputDirectory ?? Environment.CurrentDirectory),
-            BaseName = baseName,
-            VideoFrameRate = frameRate,
-            Mp3BitRateKbps = bitRate,
-            Mp3SampleRate = sampleRate,
-            MaximumSourceHeight = maximumSourceHeight,
-            UseDither = useDither,
-            UseSafeArea = useSafeArea,
-            Crop = crop,
-            AutoCrop = autoCrop,
-            KeepTemporaryFiles = keepTemporaryFiles,
-            FfmpegPath = ffmpegPath,
-            YtDlpPath = ytDlpPath,
-            JavaScriptRuntimePath = javaScriptRuntimePath,
-            DownloadTools = downloadTools,
+            OutputDirectory = Path.GetFullPath(state.OutputDirectory ?? Environment.CurrentDirectory),
+            BaseName = state.BaseName,
+            VideoFrameRate = state.FrameRate,
+            Mp3BitRateKbps = state.BitRate,
+            Mp3SampleRate = state.SampleRate,
+            MaximumSourceHeight = state.MaximumSourceHeight,
+            UseDither = state.UseDither,
+            UseSafeArea = state.UseSafeArea,
+            Crop = state.Crop,
+            AutoCrop = state.AutoCrop,
+            KeepTemporaryFiles = state.KeepTemporaryFiles,
+            FfmpegPath = state.FfmpegPath,
+            YtDlpPath = state.YtDlpPath,
+            JavaScriptRuntimePath = state.JavaScriptRuntimePath,
+            DownloadTools = state.DownloadTools,
         });
     }
 
@@ -226,6 +247,18 @@ public static class CommandLineParser
         }
 
         return value;
+    }
+
+    private static int ReadSampleRate(IReadOnlyList<string> arguments, string option, ref int index)
+    {
+        int sampleRate = ReadInteger(arguments, option, ref index, 0, int.MaxValue);
+        if (!Mp3SampleRate.IsSupported(sampleRate))
+        {
+            throw new CommandLineException(
+                $"{SampleRateOption} must be one of {string.Join(", ", Mp3SampleRate.Supported)}.");
+        }
+
+        return sampleRate;
     }
 
     /// <summary>Reads the four percentages of <c>--crop left,top,right,bottom</c>, or <c>auto</c>.</summary>
@@ -263,6 +296,27 @@ public static class CommandLineParser
         }
 
         return (crop, false);
+    }
+
+    /// <summary>The options collected so far, while the command line is being read.</summary>
+    private sealed class ParserState
+    {
+        public string? Url;
+        public string? OutputDirectory;
+        public string? BaseName;
+        public int FrameRate = KaraokeOptions.DefaultVideoFrameRate;
+        public int BitRate = KaraokeOptions.DefaultMp3BitRateKbps;
+        public int? SampleRate;
+        public int? MaximumSourceHeight;
+        public bool UseDither;
+        public bool UseSafeArea;
+        public CropMargins Crop = CropMargins.None;
+        public bool AutoCrop;
+        public bool KeepTemporaryFiles;
+        public string? FfmpegPath;
+        public string? YtDlpPath;
+        public string? JavaScriptRuntimePath;
+        public bool DownloadTools;
     }
 
     /// <summary>Reports a command line that cannot be read.</summary>
