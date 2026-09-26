@@ -11,6 +11,14 @@ Console.CancelKeyPress += (_, eventArgs) =>
 };
 
 ParseResult parsed = CommandLineParser.Parse(args);
+
+// Skipped for a bare --version: that output is meant to be a single machine-readable line, and the
+// banner already says the same thing in a friendlier shape.
+if (!parsed.VersionRequested)
+{
+    Console.WriteLine(AppVersion.Banner);
+}
+
 if (parsed.HelpRequested)
 {
     Console.WriteLine(HelpText.Full);
