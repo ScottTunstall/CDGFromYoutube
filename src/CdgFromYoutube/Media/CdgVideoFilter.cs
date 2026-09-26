@@ -48,7 +48,11 @@ public static class CdgVideoFilter
     /// <param name="framesPerSecond">The rate frames are taken from the video at.</param>
     /// <param name="useSafeArea">Whether to stay inside the area that all players are guaranteed to show.</param>
     /// <param name="crop">The margins cut from the source before it is scaled.</param>
-    public static string Build(double framesPerSecond, bool useSafeArea, CropMargins crop = default)
+    /// <param name="sharpen">
+    /// Whether to sharpen, which suits tiles of two colors. An antialiased palette wants the soft edges
+    /// that sharpening removes.
+    /// </param>
+    public static string Build(double framesPerSecond, bool useSafeArea, CropMargins crop = default, bool sharpen = true)
     {
         FrameSize raster = GetRasterSize(useSafeArea);
 
@@ -59,10 +63,16 @@ public static class CdgVideoFilter
         }
 
         // The picture is centred, so that a picture narrower or shorter than the raster gains even bars.
+        filters.Add(
+            $"scale={raster.Width}:{raster.Height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos");
+        if (sharpen)
+        {
+            filters.Add(
+                $"unsharp=luma_msize_x={SharpenKernelSize}:luma_msize_y={SharpenKernelSize}:luma_amount={SharpenAmount.ToString(CultureInfo.InvariantCulture)}");
+        }
+
         filters.AddRange(
         [
-            $"scale={raster.Width}:{raster.Height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos",
-            $"unsharp=luma_msize_x={SharpenKernelSize}:luma_msize_y={SharpenKernelSize}:luma_amount={SharpenAmount.ToString(CultureInfo.InvariantCulture)}",
             $"eq=saturation={Saturation.ToString(CultureInfo.InvariantCulture)}",
             $"pad={CdgFormat.Width}:{CdgFormat.Height}:(ow-iw)/2:(oh-ih)/2:color=black",
             "format=rgb24",

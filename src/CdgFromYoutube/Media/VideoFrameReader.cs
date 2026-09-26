@@ -21,6 +21,7 @@ public sealed class VideoFrameReader(ExternalTool ffmpeg)
     /// <param name="framesPerSecond">The rate frames are taken from the video at.</param>
     /// <param name="useSafeArea">Whether to stay inside the area that all players are guaranteed to show.</param>
     /// <param name="crop">The margins cut from the source before it is scaled.</param>
+    /// <param name="sharpen">Whether to sharpen the scaled picture; see <see cref="CdgVideoFilter.Build"/>.</param>
     /// <param name="onFrame">Called with each frame.</param>
     /// <param name="cancellationToken">Cancels the decode.</param>
     /// <returns>The number of frames that were decoded.</returns>
@@ -29,6 +30,7 @@ public sealed class VideoFrameReader(ExternalTool ffmpeg)
         double framesPerSecond,
         bool useSafeArea,
         CropMargins crop,
+        bool sharpen,
         FrameHandler onFrame,
         CancellationToken cancellationToken)
     {
@@ -36,7 +38,7 @@ public sealed class VideoFrameReader(ExternalTool ffmpeg)
 
         return await ReadCoreAsync(
                 videoPath,
-                CdgVideoFilter.Build(framesPerSecond, useSafeArea, crop),
+                CdgVideoFilter.Build(framesPerSecond, useSafeArea, crop, sharpen),
                 new FrameSize(CdgFormat.Width, CdgFormat.Height),
                 onFrame,
                 cancellationToken)
