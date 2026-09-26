@@ -16,7 +16,35 @@ public sealed class CommandLineParserTests
         ParseResult result = CommandLineParser.Parse([]);
 
         Assert.Null(result.Options);
+        Assert.Null(result.ToolSetup);
         Assert.NotNull(result.Error);
+    }
+
+    [Fact]
+    public void DownloadToolsWithoutAUrlAsksToFetchToolsOnly()
+    {
+        ParseResult result = CommandLineParser.Parse(["--download-tools"]);
+
+        Assert.Null(result.Options);
+        Assert.Null(result.Error);
+        Assert.NotNull(result.ToolSetup);
+    }
+
+    [Fact]
+    public void DownloadToolsWithoutAUrlKeepsTheToolPathsGiven()
+    {
+        ParseResult result = CommandLineParser.Parse(
+        [
+            "--download-tools",
+            "--ffmpeg", @"C:\tools\ffmpeg.exe",
+            "--yt-dlp", @"C:\tools\yt-dlp.exe",
+            "--js-runtime", @"C:\tools\deno.exe",
+        ]);
+
+        ToolSetupOptions toolSetup = Assert.IsType<ToolSetupOptions>(result.ToolSetup);
+        Assert.Equal(@"C:\tools\ffmpeg.exe", toolSetup.FfmpegPath);
+        Assert.Equal(@"C:\tools\yt-dlp.exe", toolSetup.YtDlpPath);
+        Assert.Equal(@"C:\tools\deno.exe", toolSetup.JavaScriptRuntimePath);
     }
 
     [Fact]
