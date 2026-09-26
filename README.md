@@ -121,9 +121,10 @@ why the defaults are what they are.
 | `--fps <1-60>` | Frames per second taken from the video. Default: 15. |
 | `--mp3-bitrate <8-320>` | MP3 bit rate in kbps. Default: 192. Reduced automatically if the sample rate cannot carry it. |
 | `--mp3-sample-rate <hz>` | MP3 sample rate: one of 8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100 or 48000. Default: the highest of those that is no higher than the source rate. |
-| `--max-source-height <1-4320>` | Do not download a source video taller than this many pixels, which saves bandwidth when the output is only 216 pixels tall anyway. |
-| `--dither` | Mix the two colors inside a tile so gradients stop banding. |
-| `--antialias` | Draw lyrics with smooth edges, using shades of each lyric colour. For lyrics on a plain dark background only; a new page of lyrics takes about twice as long to appear in full. |
+| `--max-source-height <1-4320>` | Download the tallest source video no taller than this many pixels, which saves bandwidth when the output is only 216 pixels tall anyway. If the video has nothing that short, the shortest version it has is used instead. For example, `--max-source-height 360` picks YouTube's 360p stream. |
+| `--dither` | Mix the two colours inside a tile so gradients stop banding. |
+| `--antialias` | Draw lyrics with smooth edges, using shades of each lyric colour. For lyrics on a plain dark background only; a new page of lyrics takes about twice as long to appear in full. Usually the best choice for a video that is mostly lyrics. |
+| `--flat-colours` | Draw each lyric colour as one solid colour, with no shades of it, so letters come out crisp rather than blotchy. For lyrics on a plain dark background only. Cannot be combined with `--antialias`. `--flat-colors` is accepted too. Without any shading, diagonal and curved strokes show a visible pixel staircase; `--antialias` avoids that at the cost of a second packet per tile. |
 | `--safe-area` | Keep the image inside the 288x192 area that every player shows. Default: use the whole 300x216 raster. |
 | `--crop <auto\|l,t,r,b>` | Cut the margins off the video before scaling it, so the lyrics are drawn bigger and less blocky. `auto` finds the area where the picture keeps changing, which is the lyrics; four numbers cut those percentages from the left, top, right and bottom. Default: no cropping. |
 | `--keep-temp` | Keep the downloaded video, and report where it is. |
@@ -198,6 +199,13 @@ The encoder works around these where it can:
   widest channel at the point where half its pixels fall on each side, and each final group gives its
   average colour. Colours dark enough to count as background (see below) are left out before the split,
   so a track with a black background does not spend the table on near black entries.
+* **Colour is scaled at full resolution.** Video stores colour at half the width and height of its
+  brightness, and ffmpeg scales in that layout, so a 300x216 frame took its colour from a 150x108 one.
+  White lettering is carried by brightness and was unaffected, but coloured lettering is mostly colour: a
+  dark red is about a quarter as bright as white. Red strokes came out at half resolution, speckled with
+  dark gaps that the palette then spent several reds on. Frames are now converted to one colour value per
+  pixel (`yuv444p`) before they are scaled, and the red strokes on a karaoke track went from levels 4 to 11
+  of 15 across a single letter to a steady 13 or 14.
 * **The picture is sharpened after it is scaled.** Scaling to 300x216 turns thin lettering into a wash of
   half shades. An unsharp mask (5x5, luma amount 0.8) pushes edge pixels back towards the colour they
   belong to, so each tile's two colours have a clearer edge to follow.
@@ -259,6 +267,22 @@ The encoder works around these where it can:
   * Thin strokes are drawn in their in-between shades instead of being rounded up, so lettering looks
     slightly dimmer, especially coloured lettering.
 
+* **`--flat-colours` draws each lyric colour as one solid colour.** Median cut spends entries where the
+  pixels are, and the edges of lettering are a large share of those, so one red lyric gets three or four
+  reds. A tile can only use two, so neighbouring tiles pick different reds and the lettering comes out
+  blotchy. This option finds the lyric colours the same way `--antialias` does, but gives each exactly one
+  entry, at the brightness the lettering reaches. Every pixel is then decided in two steps: first which
+  lyric colour its hue is nearest, then whether it is at least half as bright as that colour (lettering)
+  or not (background). The hue comes first because brightness alone is judged against the wrong colour:
+  the grey edge of a white letter, (7, 7, 7), is nearer a dark red (11, 1, 1) than it is to white or to
+  black, so drawing each pixel as its nearest entry would ring white lettering with red. Half brightness is
+  where a letter covered half of the pixel before scaling, so strokes keep their true thickness.
+  Sharpening and `--dither` are turned off, since both would put background pixels back into solid
+  strokes. The costs: a picture behind the lyrics is lost, the same as with `--antialias`'s palette, and
+  with no shading left to smooth a diagonal or curved stroke, its pixel staircase shows plainly. Try
+  `--antialias` first for a mostly-lyrics video; reach for `--flat-colours` when the extra packet per
+  tile is the more important cost to avoid.
+
 Dithering sounds like it should help, but it stays off unless `--dither` asks for it. Mixing the two
 colours of a tile softens gradients, but on that same track it measured worse against the source, and it
 turns the edges of lettering, which is about one pixel thick at this size, into visible speckle.
@@ -267,7 +291,8 @@ An amplified difference image against the source shows where the remaining error
 pixel exact, and everything that is wrong is on the lettering itself, along its antialiased edges. That is
 limit 3 above. Practically, if the blocks you see are in smooth areas such as a plasma background,
 `--dither` trades them for a fine pattern; if they are on the edges of letters and the lyrics sit on a
-plain dark background, `--antialias` smooths them at the cost of a second packet per tile.
+plain dark background, `--antialias` smooths them at the cost of a second packet per tile, and
+`--flat-colours` makes each letter one solid colour at no extra cost.
 
 The PowerShell scripts in `scripts/` help with this kind of checking:
 
@@ -282,14 +307,15 @@ The PowerShell scripts in `scripts/` help with this kind of checking:
 ## How the conversion works
 
 1. **Download.** yt-dlp fetches the best video and audio into a temporary folder, merged into Matroska so
-   that any combination of codecs works. It is limited to `--max-source-height` when that is given, and
+   that any combination of codecs works. It prefers formats within `--max-source-height` when that is given, and
    playlists are ignored, so only the one video is fetched.
 2. **Probe.** ffprobe reports the length, the video size, and the audio sample rate and channel count. The
    conversion stops if there is no video, no audio, or no length.
 3. **Lyric area** (only with `--crop auto`). Frames sampled once a second at 320 pixels wide are compared
    to find the area that keeps changing, and the crop margins are set from it.
 4. **Resolution rule.** Frames are cropped if asked, scaled into the raster with their shape preserved
-   (Lanczos), sharpened, boosted in saturation, and padded with black to 300x216 with the picture
+   (Lanczos, with colour at full resolution), sharpened (not with `--antialias` or `--flat-colours`),
+   boosted in saturation, and padded with black to 300x216 with the picture
    centred. So widescreen video gains bars instead of being stretched. Anything larger than the raster is scaled down; anything smaller
    is scaled up, because the raster is a fixed size. With `--safe-area` the picture is fitted into 288x192
    instead.
@@ -297,11 +323,11 @@ The PowerShell scripts in `scripts/` help with this kind of checking:
    or 48 kHz) that is no higher than the source, so a source MP3 already carries keeps its rate and a
    source above 48 kHz is reduced. The bit rate is reduced too if the chosen rate cannot carry it: at most
    320 kbps from 32 kHz up, 160 kbps from 16 kHz, and 64 kbps below that.
-6. **Palette.** One sixteen color palette is chosen for the whole track by median cut, from frames sampled
+6. **Palette.** One sixteen colour palette is chosen for the whole track by median cut, from frames sampled
    at one per second, with black reserved as entry 0. A fixed palette is what makes incremental drawing
-   possible: changing the color table part way through would force every tile to be redrawn.
-7. **Tiles.** The file starts by clearing the screen, loading the color table and clearing the border.
-   Each frame is then reduced to 6x12 tiles. A tile may only use two of the sixteen colors, so each tile is
+   possible: changing the colour table part way through would force every tile to be redrawn.
+7. **Tiles.** The file starts by clearing the screen, loading the colour table and clearing the border.
+   Each frame is then reduced to 6x12 tiles. A tile may only use two of the sixteen colours, so each tile is
    rebuilt from the pair that best explains the pixels inside it, and the twelve scanline bytes say which
    pixels take which of the two. Where a third colour is worth it, an XOR tile adds it. Only the tiles that
    differ from what is already on screen, by enough to be worth it (see "Only tiles that change are
@@ -317,7 +343,7 @@ The PowerShell scripts in `scripts/` help with this kind of checking:
 
 ```text
 src/CdgFromYoutube/
-  Cdg/          the packet format, color table, palette building, tile encoding and packet budget
+  Cdg/          the packet format, colour table, palette building, tile encoding and packet budget
   Imaging/      pixel layout, aspect fitting, cropping, lyric area detection and the ordered dither matrix
   Media/        yt-dlp, ffprobe, ffmpeg and LAME: everything that touches the outside world
   Tooling/      finding, and if asked, downloading the external tools
@@ -328,7 +354,7 @@ scripts/       helpers for looking at the graphics and measuring them against th
 ```
 
 The CD+G details come from "CD+G Revealed" by Jim Bumgardner (https://jbum.com/cdg_revealed.html), checked
-against the CD+G decoder in VLC, which agrees on the tile size, the tile addressing and the color table
+against the CD+G decoder in VLC, which agrees on the tile size, the tile addressing and the colour table
 layout. The classes that depend on the format say so in their `<remarks>`.
 
 ## Tests
@@ -337,7 +363,7 @@ layout. The classes that depend on the format say so in their `<remarks>`.
 dotnet test
 ```
 
-The xUnit suite covers the color table packing, the packet writer, the tile encoding and its bit order,
+The xUnit suite covers the colour table packing, the packet writer, the tile encoding and its bit order,
 the packet budget with frame dropping and holding back, when a changed tile is worth redrawing, the
 palette reduction, the ffmpeg filter chain, cropping and lyric area detection, the ffprobe parsing, the MP3
 sample and bit rates, output file naming, the yt-dlp command line, and the program's own command line.
@@ -346,5 +372,5 @@ sample and bit rates, output file naming, the yt-dlp command line, and the progr
 
 Every packet is 24 bytes: `0x09` in byte 0, the instruction in byte 1, and the instruction's data from byte
 4. A `.cdg` file therefore holds `length x 300` packets, and reading byte 1 of each one shows the shape of
-the file: 1 and 2 are the memory and border presets, 30 and 31 load the color table, 6 draws a tile,
+the file: 1 and 2 are the memory and border presets, 30 and 31 load the colour table, 6 draws a tile,
 38 draws a tile by XOR-ing it onto the screen, and 0 is a packet that carries no command at all.
