@@ -49,6 +49,14 @@ public sealed record KaraokeOptions
     /// </remarks>
     public bool UseDither { get; init; }
 
+    /// <summary>Whether lettering is drawn with smooth edges, using a palette of lyric color shades.</summary>
+    /// <remarks>
+    /// Off by default, because it suits lyrics over a plain dark background only: the palette holds shades
+    /// of the lyric colors rather than the colors of a picture, and every tile of lettering costs two
+    /// packets instead of one, so a new page of lyrics takes about twice as long to appear in full.
+    /// </remarks>
+    public bool Antialias { get; init; }
+
     /// <summary>Whether the image is kept inside the area that all players are guaranteed to show.</summary>
     public bool UseSafeArea { get; init; }
 

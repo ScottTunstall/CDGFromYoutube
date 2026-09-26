@@ -20,6 +20,7 @@ public static class CommandLineParser
     private const string SampleRateOption = "--mp3-sample-rate";
     private const string MaximumSourceHeightOption = "--max-source-height";
     private const string DitherOption = "--dither";
+    private const string AntialiasOption = "--antialias";
     private const string SafeAreaOption = "--safe-area";
     private const string CropOption = "--crop";
     private const string AutoCropValue = "auto";
@@ -132,6 +133,10 @@ public static class CommandLineParser
                 (state.Crop, state.AutoCrop) = ReadCrop(arguments, argument, ref index);
                 return true;
 
+            case AntialiasOption:
+                state.Antialias = true;
+                return true;
+
             case KeepTemporaryFilesOption:
                 state.KeepTemporaryFiles = true;
                 return true;
@@ -205,6 +210,7 @@ public static class CommandLineParser
             Mp3SampleRate = state.SampleRate,
             MaximumSourceHeight = state.MaximumSourceHeight,
             UseDither = state.UseDither,
+            Antialias = state.Antialias,
             UseSafeArea = state.UseSafeArea,
             Crop = state.Crop,
             AutoCrop = state.AutoCrop,
@@ -309,6 +315,7 @@ public static class CommandLineParser
         public int? SampleRate;
         public int? MaximumSourceHeight;
         public bool UseDither;
+        public bool Antialias;
         public bool UseSafeArea;
         public CropMargins Crop = CropMargins.None;
         public bool AutoCrop;
