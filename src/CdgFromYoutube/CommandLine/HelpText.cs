@@ -43,6 +43,7 @@ public static class HelpText
               --download-tools           Fetch yt-dlp, ffmpeg and Deno into the program's tools folder
                                          when they are missing, without asking first
           -h, --help                     Show this text
+          -v, --version                  Show the program's version
 
           Run with just --download-tools and no URL to fetch the tools without converting a video.
           The tools are fetched once and kept next to the program, so later runs from any folder find them.

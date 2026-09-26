@@ -32,6 +32,7 @@ public static class CommandLineParser
     private const string JavaScriptRuntimeOption = "--js-runtime";
     private const string DownloadToolsOption = "--download-tools";
     private const string HelpOption = "--help";
+    private const string VersionOption = "--version";
 
     /// <summary>Reads a command line.</summary>
     public static ParseResult Parse(IReadOnlyList<string> arguments)
@@ -58,6 +59,11 @@ public static class CommandLineParser
             if (argument is "-h" or HelpOption)
             {
                 return ParseResult.Help();
+            }
+
+            if (argument is "-v" or VersionOption)
+            {
+                return ParseResult.Version();
             }
 
             if (!TryApplyOption(state, argument, arguments, ref index))

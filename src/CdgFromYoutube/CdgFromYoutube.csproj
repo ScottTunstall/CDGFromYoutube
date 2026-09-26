@@ -4,6 +4,14 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>cdgfromyoutube</AssemblyName>
     <RootNamespace>CdgFromYoutube</RootNamespace>
+    <!--
+      The program's version: shown by the version option, and read by installer\build.ps1 as the version
+      stamped into the installer unless -Version overrides it there. This is the one place it is set;
+      bump it here for every release rather than passing -Version by hand.
+    -->
+    <Version>1.1.0</Version>
+    <!-- Otherwise the SDK appends "+<commit hash>", which the version option has no reason to show. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>

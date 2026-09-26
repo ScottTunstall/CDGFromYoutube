@@ -17,6 +17,12 @@ if (parsed.HelpRequested)
     return 0;
 }
 
+if (parsed.VersionRequested)
+{
+    Console.WriteLine(AppVersion.Current);
+    return 0;
+}
+
 ConsoleProgressSink progress = new();
 
 if (parsed.ToolSetup is not null)
