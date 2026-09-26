@@ -2,7 +2,7 @@
 
 >**Disclaimer:** Using this tool to create CDGs for profit or for illegal purposes is **PROHIBITED**. I will NOT be liable for any illegal activity resulting from the use of this tool.
 
-Turns a YouTube karaoke video into a proper karaoke file pair: a `.cdg` graphics file and the matching
+Turns a YouTube karaoke video into a karaoke file pair: a `.cdg` graphics file and the matching
 `.mp3`. Karaoke players such as KaraFun pick the two up automatically, because they share the same file
 name.
 
@@ -12,8 +12,7 @@ cdgfromyoutube "https://www.youtube.com/watch?v=..." -o "C:\Music\Karaoke"
 
 ## Quick start
 
-1. Run the installer, `CDGFromYoutubeSetup.exe` (build it yourself from
-   [installer/](installer/README.md), or use one someone gave you). It installs the program and, if it is
+1. Run the installer, `CDGFromYoutubeSetup.exe` (get it from the releases section on Github). It installs the program and, if it is
    missing, the .NET runtime it needs.
 2. Open a new Command Prompt. (One that was already open won't see the change the installer just made, so
    open a fresh one.)
