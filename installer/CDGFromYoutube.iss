@@ -25,6 +25,10 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
+; DisableDirPage defaults to "auto", which skips the destination page whenever the same AppId is
+; already installed (e.g. a previous test install) and silently reuses that old location. Setting it
+; to "no" keeps the page showing every time, so the folder is always visible and changeable.
+DisableDirPage=no
 DisableProgramGroupPage=yes
 ; Shows the license page with "I accept" / "I do not accept" radio buttons and refuses to let setup
 ; continue past it until "I accept" is chosen - this is what makes the disclaimer a real gate rather
@@ -49,6 +53,11 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "addtopath"; Description: "Add {#MyAppName} to the PATH, so ""{#MyAppExeName}"" can be run from any Command Prompt"
+
+[Dirs]
+; The program downloads yt-dlp, ffmpeg and Deno here on first use. Program Files is read-only to ordinary
+; users, so this one folder is made writable for them; without it, downloading would need an elevated prompt.
+Name: "{app}\tools"; Permissions: users-modify
 
 [Files]
 ; publish\ is created by build.ps1 (dotnet publish); everything it contains is the program.
@@ -85,6 +94,44 @@ const
 function GetInstallDir(): string;
 begin
   Result := ExpandConstant('{app}');
+end;
+
+{ Finds the command line a previously installed version registered for its own uninstaller, by AppId
+  (fixed in [Setup] above), so a leftover install from an older version can be removed automatically
+  before this one is put down - otherwise files an older version wrote but a newer one no longer
+  includes would be left behind, since the same AppId makes Inno install over the old copy in place. }
+function GetPreviousUninstallString(): string;
+var
+  UninstallKey: string;
+  UninstallCommand: string;
+begin
+  UninstallKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1';
+  if not RegQueryStringValue(HKLM, UninstallKey, 'UninstallString', UninstallCommand) then
+    RegQueryStringValue(HKCU, UninstallKey, 'UninstallString', UninstallCommand);
+  Result := UninstallCommand;
+end;
+
+{ Runs a previously installed version's own uninstaller silently, before this version's files are
+  copied in. Errors are ignored (best effort): a failed removal still leaves the new install to
+  overwrite what it can, which is no worse than not attempting this at all. }
+procedure UninstallPreviousVersion();
+var
+  UninstallCommand: string;
+  ExitCode: Integer;
+begin
+  UninstallCommand := GetPreviousUninstallString();
+  if UninstallCommand = '' then
+    Exit;
+
+  UninstallCommand := RemoveQuotes(UninstallCommand);
+  Exec(UninstallCommand, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE,
+      ewWaitUntilTerminated, ExitCode);
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  UninstallPreviousVersion();
+  Result := True;
 end;
 
 { Appends the install directory to the machine PATH, unless it is already there. }
@@ -172,4 +219,14 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then
     RemoveFromPath();
+
+  { The downloaded tools are not files the installer put down, so Inno would leave them behind. They are
+    removed on a normal uninstall, but kept when a newer version's setup silently uninstalls this one
+    first (see UninstallPreviousVersion), so an upgrade does not have to download them all again. }
+  if (CurUninstallStep = usPostUninstall) and not UninstallSilent() then
+  begin
+    DelTree(ExpandConstant('{app}\tools'), True, True, True);
+    { Only succeeds when empty, so nothing the user put in the install folder themselves is touched. }
+    RemoveDir(ExpandConstant('{app}'));
+  end;
 end;
