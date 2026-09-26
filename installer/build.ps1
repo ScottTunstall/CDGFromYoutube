@@ -11,10 +11,11 @@
     Needs the .NET 10 SDK and Inno Setup 6 (https://jrsoftware.org/isinfo.php) installed.
 
 .PARAMETER Version
-    The version number written into the installed program's "Installed apps" entry. Defaults to 1.0.0.
+    The version number written into the installed program's "Installed apps" entry. Defaults to the
+    <Version> in CdgFromYoutube.csproj, which is also what --version reports, so the two stay in step.
 #>
 param(
-    [string]$Version = "1.0.0"
+    [string]$Version
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,6 +23,13 @@ $installerDir = $PSScriptRoot
 $repoRoot = Split-Path $installerDir -Parent
 $publishDir = Join-Path $installerDir "publish"
 $projectPath = Join-Path $repoRoot "src\CdgFromYoutube\CdgFromYoutube.csproj"
+
+if (-not $Version) {
+    $Version = ([xml](Get-Content $projectPath)).Project.PropertyGroup.Version
+    if (-not $Version) {
+        throw "No <Version> found in $projectPath, and -Version was not given."
+    }
+}
 
 Write-Output "Publishing CdgFromYoutube $Version (framework-dependent, win-x64)..."
 if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }

@@ -24,8 +24,9 @@ installer\build.ps1
 
 This publishes CdgFromYoutube (framework-dependent, so the installer is what fetches the .NET runtime,
 not the program itself) into `installer\publish`, then compiles `CDGFromYoutube.iss` into
-`installer\Output\CDGFromYoutubeSetup.exe`. Pass `-Version 1.2.0` to stamp a different version into the
-installed program's entry; it defaults to `1.0.0`.
+`installer\Output\CDGFromYoutubeSetup.exe`. The version stamped into the installed program's entry is
+read from `<Version>` in `CdgFromYoutube.csproj` (the same version `--version` reports); pass
+`-Version 1.2.0` to stamp a different one instead.
 
 ## What it does
 
