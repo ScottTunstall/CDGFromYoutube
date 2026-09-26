@@ -88,6 +88,17 @@ public sealed class CommandLineParserTests
     }
 
     [Fact]
+    public void AntialiasingIsOffUnlessAskedFor()
+    {
+        KaraokeOptions plain = Assert.IsType<KaraokeOptions>(CommandLineParser.Parse([VideoUrl]).Options);
+        KaraokeOptions antialiased = Assert.IsType<KaraokeOptions>(
+            CommandLineParser.Parse([VideoUrl, "--antialias"]).Options);
+
+        Assert.False(plain.Antialias);
+        Assert.True(antialiased.Antialias);
+    }
+
+    [Fact]
     public void AnOptionWithoutAValueIsRejected()
     {
         ParseResult result = CommandLineParser.Parse([VideoUrl, "--output"]);

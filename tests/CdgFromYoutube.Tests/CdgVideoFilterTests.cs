@@ -42,6 +42,16 @@ public sealed class CdgVideoFilterTests
     }
 
     [Fact]
+    public void SharpeningCanBeLeftOut()
+    {
+        Assert.Contains("unsharp=", CdgVideoFilter.Build(framesPerSecond: 15, useSafeArea: false), StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "unsharp=",
+            CdgVideoFilter.Build(framesPerSecond: 15, useSafeArea: false, sharpen: false),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheSafeAreaFilterChainLeavesTheBorderClear()
     {
         string filter = CdgVideoFilter.Build(framesPerSecond: 1, useSafeArea: true);

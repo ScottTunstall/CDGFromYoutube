@@ -164,6 +164,53 @@ public sealed class CdgTileEncoderTests
     }
 
     [Fact]
+    public void AntialiasedEdgesAreDrawnInTheShadesOfARamp()
+    {
+        CdgPalette palette = CreateGreyRampPalette();
+        byte[] pixels = CreateFrame(0, 0, 0);
+        FillRectangle(pixels, firstX: 0, firstY: 0, width: 2, height: CdgFormat.TileHeight, red: 255, green: 255, blue: 255);
+        FillRectangle(pixels, firstX: 2, firstY: 0, width: 1, height: CdgFormat.TileHeight, red: 170, green: 170, blue: 170);
+        FillRectangle(pixels, firstX: 3, firstY: 0, width: 1, height: CdgFormat.TileHeight, red: 85, green: 85, blue: 85);
+
+        CdgTileImage image = new CdgTileEncoder(palette, useDither: false).Encode(pixels);
+
+        Assert.True(image.HasXorPass(0));
+        Assert.Equal(new CdgColor(15, 15, 15), palette[DecodePixel(image, 0, x: 0, y: 0)]);
+        Assert.Equal(new CdgColor(10, 10, 10), palette[DecodePixel(image, 0, x: 2, y: 0)]);
+        Assert.Equal(new CdgColor(5, 5, 5), palette[DecodePixel(image, 0, x: 3, y: 0)]);
+        Assert.Equal(CdgColor.Black, palette[DecodePixel(image, 0, x: 5, y: 0)]);
+    }
+
+    [Fact]
+    public void TheFirstPassOfARampTileAloneShowsTheBrightPartOfTheLetters()
+    {
+        // The second pass can wait for a later frame, so the first must read as lettering by itself.
+        CdgPalette palette = CreateGreyRampPalette();
+        byte[] pixels = CreateFrame(0, 0, 0);
+        FillRectangle(pixels, firstX: 0, firstY: 0, width: 2, height: CdgFormat.TileHeight, red: 255, green: 255, blue: 255);
+        FillRectangle(pixels, firstX: 2, firstY: 0, width: 1, height: CdgFormat.TileHeight, red: 170, green: 170, blue: 170);
+        FillRectangle(pixels, firstX: 3, firstY: 0, width: 1, height: CdgFormat.TileHeight, red: 85, green: 85, blue: 85);
+
+        CdgTileImage image = new CdgTileEncoder(palette, useDither: false).Encode(pixels);
+
+        Assert.Equal(CdgPaletteBuilder.BlackColorIndex, image.GetColor0(0));
+        Assert.Equal(new CdgColor(15, 15, 15), palette[image.GetColor1(0)]);
+        Assert.Equal(0b111000, image.GetScanlines(0)[0]);
+    }
+
+    [Fact]
+    public void ASingleFaintEdgePixelDoesNotCostASecondPacket()
+    {
+        byte[] pixels = CreateFrame(0, 0, 0);
+        FillRectangle(pixels, firstX: 0, firstY: 0, width: 3, height: CdgFormat.TileHeight, red: 255, green: 255, blue: 255);
+        SetPixel(pixels, x: 4, y: 0, red: 85, green: 85, blue: 85);
+
+        CdgTileImage image = new CdgTileEncoder(CreateGreyRampPalette(), useDither: false).Encode(pixels);
+
+        Assert.False(image.HasXorPass(0));
+    }
+
+    [Fact]
     public void FramesThatAreTooShortAreRejected()
     {
         CdgTileEncoder encoder = CreateEncoder(useDither: false);
@@ -172,6 +219,13 @@ public sealed class CdgTileEncoderTests
     }
 
     private static CdgTileEncoder CreateEncoder(bool useDither) => new(CreatePalette(), useDither);
+
+    private static CdgPalette CreateGreyRampPalette()
+    {
+        CdgColorHistogram histogram = new();
+        histogram.Add(new CdgColor(15, 15, 15), 100);
+        return CdgRampPaletteBuilder.Build(histogram);
+    }
 
     private static CdgPalette CreatePalette()
     {

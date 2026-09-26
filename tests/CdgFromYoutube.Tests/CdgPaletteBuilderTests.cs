@@ -38,6 +38,34 @@ public sealed class CdgPaletteBuilderTests
     }
 
     [Fact]
+    public void WhiteLetteringAveragedWithAFewColoredPixelsStaysWhite()
+    {
+        // Reserving all but one entry puts every sampled color into a single box, so its average is exactly
+        // the mix that tinted white lyrics blue.
+        List<CdgColor> reserved = [CdgColor.Black];
+        for (int red = 1; reserved.Count < CdgFormat.ColorCount - 1; red++)
+        {
+            reserved.Add(new CdgColor((byte)red, 0, 0));
+        }
+
+        CdgColorHistogram histogram = new();
+        for (int sample = 0; sample < 90; sample++)
+        {
+            histogram.Add(new CdgColor(14, 14, 14));
+        }
+
+        for (int sample = 0; sample < 10; sample++)
+        {
+            histogram.Add(new CdgColor(6, 9, 15));
+        }
+
+        CdgColor averaged = CdgPaletteBuilder.Build(histogram, reserved)[CdgFormat.ColorCount - 1];
+
+        Assert.Equal(averaged.Red, averaged.Green);
+        Assert.Equal(averaged.Green, averaged.Blue);
+    }
+
+    [Fact]
     public void AnEmptyHistogramStillProducesAPalette()
     {
         CdgPalette palette = CdgPaletteBuilder.Build(new CdgColorHistogram(), [CdgColor.Black]);
