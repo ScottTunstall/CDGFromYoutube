@@ -98,6 +98,30 @@ public sealed class CommandLineParserTests
         Assert.True(antialiased.Antialias);
     }
 
+    [Theory]
+    [InlineData("--flat-colours")]
+    [InlineData("--flat-colors")]
+    public void FlatColoursAreOffUnlessAskedForAndTurnSharpeningOff(string option)
+    {
+        KaraokeOptions plain = Assert.IsType<KaraokeOptions>(CommandLineParser.Parse([VideoUrl]).Options);
+        KaraokeOptions flat = Assert.IsType<KaraokeOptions>(
+            CommandLineParser.Parse([VideoUrl, option]).Options);
+
+        Assert.False(plain.FlatColors);
+        Assert.True(plain.Sharpen);
+        Assert.True(flat.FlatColors);
+        Assert.False(flat.Sharpen);
+    }
+
+    [Fact]
+    public void FlatColoursAndAntialiasingCannotBeCombined()
+    {
+        ParseResult result = CommandLineParser.Parse([VideoUrl, "--antialias", "--flat-colors"]);
+
+        Assert.Null(result.Options);
+        Assert.Contains("--flat-colours", result.Error ?? string.Empty, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AnOptionWithoutAValueIsRejected()
     {

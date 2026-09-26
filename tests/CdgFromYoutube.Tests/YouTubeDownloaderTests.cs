@@ -27,11 +27,22 @@ public sealed class YouTubeDownloaderTests
     }
 
     [Fact]
-    public void AHeightLimitNarrowsTheFormatsThatAreOffered()
+    public void AHeightLimitPrefersFormatsWithinItWithoutRulingOutTheRest()
     {
         IReadOnlyList<string> arguments = BuildArguments(runtimePath: null, maximumSourceHeight: 360);
 
-        Assert.Contains(arguments, argument => argument.Contains("height<=360", StringComparison.Ordinal));
+        int sortIndex = IndexOf(arguments, "--format-sort");
+        Assert.Equal("res:360", arguments[sortIndex + 1]);
+        Assert.Equal("bv*+ba/b", arguments[IndexOf(arguments, "--format") + 1]);
+    }
+
+    [Fact]
+    public void NoFormatSortIsPassedWithoutAHeightLimit()
+    {
+        IReadOnlyList<string> arguments = BuildArguments(runtimePath: null, maximumSourceHeight: null);
+
+        Assert.DoesNotContain("--format-sort", arguments);
+        Assert.Equal("bv*+ba/b", arguments[IndexOf(arguments, "--format") + 1]);
     }
 
     [Fact]
@@ -59,6 +70,13 @@ public sealed class YouTubeDownloaderTests
             runtimePath);
 
         return downloader.BuildArguments(new Uri(VideoUrl), "downloads", maximumSourceHeight);
+    }
+
+    private static int IndexOf(IReadOnlyList<string> arguments, string option)
+    {
+        int index = arguments.ToList().IndexOf(option);
+        Assert.True(index >= 0, $"{option} was not passed.");
+        return index;
     }
 
     /// <summary>A sink that throws the progress away, for the tests that only care about what is built.</summary>

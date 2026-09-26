@@ -211,6 +211,31 @@ public sealed class CdgTileEncoderTests
     }
 
     [Fact]
+    public void AFlatPaletteDrawsALetterAndItsDimEdgeInOneSolidColor()
+    {
+        CdgColorHistogram histogram = new();
+        histogram.Add(new CdgColor(15, 15, 15), 100);
+        histogram.Add(new CdgColor(11, 1, 1), 100);
+        CdgPalette palette = CdgFlatPaletteBuilder.Build(histogram);
+        byte[] pixels = CreateFrame(0, 0, 0);
+        byte full = CdgColor.ToEightBitChannel(11);
+        byte edge = CdgColor.ToEightBitChannel(6);
+        FillRectangle(pixels, firstX: 0, firstY: 0, width: 2, height: CdgFormat.TileHeight, red: full, green: 17, blue: 17);
+        FillRectangle(pixels, firstX: 2, firstY: 0, width: 1, height: CdgFormat.TileHeight, red: edge, green: 0, blue: 0);
+
+        // Dithering is asked for, and must not put background pixels back into the lettering.
+        CdgTileImage image = new CdgTileEncoder(palette, useDither: true).Encode(pixels);
+
+        Assert.False(image.HasXorPass(0));
+        for (int y = 0; y < CdgFormat.TileHeight; y++)
+        {
+            Assert.Equal(new CdgColor(11, 1, 1), palette[DecodePixel(image, 0, x: 0, y)]);
+            Assert.Equal(new CdgColor(11, 1, 1), palette[DecodePixel(image, 0, x: 2, y)]);
+            Assert.Equal(CdgColor.Black, palette[DecodePixel(image, 0, x: 3, y)]);
+        }
+    }
+
+    [Fact]
     public void FramesThatAreTooShortAreRejected()
     {
         CdgTileEncoder encoder = CreateEncoder(useDither: false);

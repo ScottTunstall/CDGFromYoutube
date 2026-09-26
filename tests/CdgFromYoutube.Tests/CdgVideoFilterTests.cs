@@ -42,6 +42,16 @@ public sealed class CdgVideoFilterTests
     }
 
     [Fact]
+    public void ColorIsSpreadToEveryPixelBeforeTheFrameIsScaled()
+    {
+        // Scaled in the video's own layout, the color would only be kept at half the width and height.
+        string filter = CdgVideoFilter.Build(framesPerSecond: 15, useSafeArea: false);
+
+        int fullColor = filter.IndexOf("format=yuv444p", StringComparison.Ordinal);
+        Assert.InRange(fullColor, 0, filter.IndexOf("scale=", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void SharpeningCanBeLeftOut()
     {
         Assert.Contains("unsharp=", CdgVideoFilter.Build(framesPerSecond: 15, useSafeArea: false), StringComparison.Ordinal);
