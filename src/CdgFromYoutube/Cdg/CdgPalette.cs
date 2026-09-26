@@ -14,8 +14,19 @@ public sealed class CdgPalette
 
     /// <summary>Creates a palette from exactly <see cref="CdgFormat.ColorCount"/> colors.</summary>
     public CdgPalette(IReadOnlyList<CdgColor> colors)
+        : this(colors, [])
+    {
+    }
+
+    /// <summary>
+    /// Creates a palette from exactly <see cref="CdgFormat.ColorCount"/> colors, some of which form the
+    /// shades of antialiased lettering.
+    /// </summary>
+    public CdgPalette(IReadOnlyList<CdgColor> colors, IReadOnlyList<CdgRamp> ramps)
     {
         ArgumentNullException.ThrowIfNull(colors);
+        ArgumentNullException.ThrowIfNull(ramps);
+        Ramps = [.. ramps];
         if (colors.Count != CdgFormat.ColorCount)
         {
             throw new ArgumentException(
@@ -35,6 +46,9 @@ public sealed class CdgPalette
             }
         }
     }
+
+    /// <summary>The shades of antialiased lettering, or none when the palette was built from the picture.</summary>
+    public IReadOnlyList<CdgRamp> Ramps { get; }
 
     /// <summary>The palette entries in table order.</summary>
     public ReadOnlySpan<CdgColor> Colors => _colors;

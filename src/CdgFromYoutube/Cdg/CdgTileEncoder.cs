@@ -28,6 +28,17 @@ public sealed class CdgTileEncoder
     /// </remarks>
     private const int MinimumThirdColorGain = 400;
 
+    /// <summary>
+    /// How much drawing a tile with a ramp of shades has to reduce its error, over the best pair, before
+    /// the second packet the ramp costs is paid. Only used when the palette has ramps.
+    /// </summary>
+    /// <remarks>
+    /// Far lower than <see cref="MinimumThirdColorGain"/>, because smoothing edge pixels is the whole point
+    /// of a ramp palette. One edge pixel a third of the way to white is 75 away from black, so this spends
+    /// the packet on any tile with at least two such pixels, but not on a single stray one.
+    /// </remarks>
+    private const int MinimumRampGain = 150;
+
     /// <summary>Creates an encoder that reduces frames to tiles of the given palette.</summary>
     /// <param name="palette">The palette that every tile's two colors are taken from.</param>
     /// <param name="useDither">Whether to mix the two colors of a tile to soften gradients.</param>
@@ -75,7 +86,7 @@ public sealed class CdgTileEncoder
             for (int x = 0; x < CdgFormat.Width; x++)
             {
                 int offset = pixel * RgbPixelFormat.BytesPerPixel;
-                CdgColor color = CdgColor.FromEightBit(
+                CdgColor color = CdgColor.FromVideoPixel(
                     rgbPixels[offset],
                     rgbPixels[offset + 1],
                     rgbPixels[offset + 2]);
@@ -133,7 +144,26 @@ public sealed class CdgTileEncoder
         CountTileColors(firstX, firstY);
 
         (byte bestFirst, byte bestSecond, long pairError) = FindBestColorPair();
-        if (TryFindThirdColor(pairError, out byte first, out byte second, out byte third))
+        bool hasThirdColor = TryFindThirdColor(
+            pairError,
+            out byte first,
+            out byte second,
+            out byte third,
+            out long thirdColorError);
+
+        // A ramp costs the same two packets as a third color, so it only has to beat that on error; against
+        // a plain pair it has to earn its second packet.
+        long errorToBeat = hasThirdColor ? thirdColorError : pairError - MinimumRampGain;
+        if (TryFindRamp(errorToBeat, out CdgRamp ramp))
+        {
+            color0 = CdgPaletteBuilder.BlackColorIndex;
+            color1 = ramp.Full;
+            xorColor = ramp.Third;
+            BuildRampScanlines(ramp, firstX, firstY, scanlines, xorScanlines);
+            return;
+        }
+
+        if (hasThirdColor)
         {
             // The pixels of the third color are drawn by the first pass in whichever of the other two is
             // nearer to it, so that the tile still looks right before the second pass flips them.
@@ -164,11 +194,17 @@ public sealed class CdgTileEncoder
     /// than the white lettering is, so the letters being sung would be drawn as a black block. Only the
     /// entries the tile actually uses are tried, which is a handful, so this costs little.
     /// </remarks>
-    private bool TryFindThirdColor(long pairError, out byte first, out byte second, out byte third)
+    private bool TryFindThirdColor(
+        long pairError,
+        out byte first,
+        out byte second,
+        out byte third,
+        out long error)
     {
         first = 0;
         second = 0;
         third = 0;
+        error = long.MaxValue;
 
         Span<byte> used = stackalloc byte[CdgFormat.ColorCount];
         int usedCount = 0;
@@ -193,10 +229,10 @@ public sealed class CdgTileEncoder
             {
                 for (int c = b + 1; c < usedCount; c++)
                 {
-                    long error = GetTripleError(used[a], used[b], used[c]);
-                    if (error < bestError)
+                    long tripleError = GetTripleError(used[a], used[b], used[c]);
+                    if (tripleError < bestError)
                     {
-                        bestError = error;
+                        bestError = tripleError;
                         (first, second, third) = ChooseThirdColor(used[a], used[b], used[c]);
                         found = true;
                     }
@@ -204,7 +240,66 @@ public sealed class CdgTileEncoder
             }
         }
 
+        if (found)
+        {
+            error = bestError;
+        }
+
         return found;
+    }
+
+    /// <summary>Looks for the ramp of shades that draws the tile with less error than <paramref name="errorToBeat"/>.</summary>
+    private bool TryFindRamp(long errorToBeat, out CdgRamp bestRamp)
+    {
+        bestRamp = default;
+        long bestError = errorToBeat;
+        bool found = false;
+        foreach (CdgRamp ramp in _palette.Ramps)
+        {
+            long error = GetRampError(ramp);
+            if (error < bestError)
+            {
+                bestError = error;
+                bestRamp = ramp;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>The error the tile suffers when it is drawn with black and the three shades of a ramp.</summary>
+    private long GetRampError(CdgRamp ramp)
+    {
+        long error = 0;
+        for (int index = 0; index < CdgFormat.ColorCount; index++)
+        {
+            int count = _tileHistogram[index];
+            if (count > 0)
+            {
+                error += (long)count * GetRampDistance((byte)index, ramp, out _);
+            }
+        }
+
+        return error;
+    }
+
+    /// <summary>Returns how far a palette entry is from the nearest of black and a ramp's shades, and which that is.</summary>
+    private int GetRampDistance(byte index, CdgRamp ramp, out byte nearest)
+    {
+        nearest = CdgPaletteBuilder.BlackColorIndex;
+        int best = _palette.GetDistanceSquared(index, nearest);
+        foreach (byte shade in (ReadOnlySpan<byte>)[ramp.Full, ramp.TwoThirds, ramp.Third])
+        {
+            int distance = _palette.GetDistanceSquared(index, shade);
+            if (distance < best)
+            {
+                best = distance;
+                nearest = shade;
+            }
+        }
+
+        return best;
     }
 
     /// <summary>
@@ -377,6 +472,43 @@ public sealed class CdgTileEncoder
                 else if (toSecond < toFirst)
                 {
                     bits |= bit;
+                }
+            }
+
+            scanlines[y] = bits;
+            xorScanlines[y] = xorBits;
+        }
+    }
+
+    /// <summary>
+    /// Writes the scanlines that draw a tile in black and the three shades of a ramp. The first pass draws
+    /// the full color wherever the pixel is two thirds or full, and black elsewhere; the exclusive-or pass
+    /// then turns black into a third, and the full color into two thirds, wherever those are wanted.
+    /// </summary>
+    private void BuildRampScanlines(
+        CdgRamp ramp,
+        int firstX,
+        int firstY,
+        Span<byte> scanlines,
+        Span<byte> xorScanlines)
+    {
+        for (int y = 0; y < CdgFormat.TileHeight; y++)
+        {
+            int rowStart = ((firstY + y) * CdgFormat.Width) + firstX;
+            byte bits = 0;
+            byte xorBits = 0;
+            for (int x = 0; x < CdgFormat.TileWidth; x++)
+            {
+                GetRampDistance(_paletteIndices[rowStart + x], ramp, out byte shade);
+                byte bit = (byte)(1 << (CdgFormat.TileWidth - 1 - x));
+                if (shade == ramp.Full || shade == ramp.TwoThirds)
+                {
+                    bits |= bit;
+                }
+
+                if (shade == ramp.Third || shade == ramp.TwoThirds)
+                {
+                    xorBits |= bit;
                 }
             }
 

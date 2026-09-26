@@ -20,10 +20,13 @@ public sealed class CdgColorHistogram
     public long SampleCount { get; private set; }
 
     /// <summary>Counts a single color once.</summary>
-    public void Add(CdgColor color)
+    public void Add(CdgColor color) => Add(color, 1);
+
+    /// <summary>Counts a color the given number of times.</summary>
+    public void Add(CdgColor color, int count)
     {
-        _counts[color.Pack()]++;
-        SampleCount++;
+        _counts[color.Pack()] += count;
+        SampleCount += count;
     }
 
     /// <summary>Counts every pixel of a frame of packed eight bit red, green and blue pixels.</summary>
@@ -31,7 +34,7 @@ public sealed class CdgColorHistogram
     {
         for (int offset = 0; offset + RgbPixelFormat.BytesPerPixel <= rgbPixels.Length; offset += RgbPixelFormat.BytesPerPixel)
         {
-            Add(CdgColor.FromEightBit(
+            Add(CdgColor.FromVideoPixel(
                 rgbPixels[offset],
                 rgbPixels[offset + 1],
                 rgbPixels[offset + 2]));

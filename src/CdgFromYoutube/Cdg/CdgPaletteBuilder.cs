@@ -53,10 +53,12 @@ public static class CdgPaletteBuilder
             .Where(bucket => !blackIsReserved || !IsBackground(bucket.Color))];
         List<ColorBox> boxes = SplitIntoBoxes(buckets, CdgFormat.ColorCount - reservedColors.Count);
 
+        // A box can hold grey lettering together with a few colored pixels, and its average is then a tinted
+        // white that the lettering gets drawn with. Snapping such an average back to grey keeps white white.
         List<CdgColor> colors = [.. reservedColors];
         colors.AddRange(boxes
             .OrderByDescending(box => box.Weight)
-            .Select(box => GetAverageColor(buckets, box)));
+            .Select(box => GetAverageColor(buckets, box).ToGreyIfNearlyGrey()));
 
         while (colors.Count < CdgFormat.ColorCount)
         {
